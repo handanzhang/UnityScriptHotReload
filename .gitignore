@@ -59,3 +59,10 @@ sysinfo.txt
 crashlytics-build.properties
 
 obj
+UserSettings/EditorUserSettings.asset
+Assets/Scenes/
+.idea/
+Assets/HotReload/Editor/AssemblyPatcher~/
+*.meta
+*.dll
+*.exe

@@ -65,6 +65,8 @@ namespace ScriptHotReload
         public static MethodInfo miRequestScriptCompilation { get; private set; }
         public static MethodInfo miDirtyAllScripts { get; private set; }
 
+        public static MethodInfo miSetCompileScriptsOutputDirectory;
+
         public static object EditorCompilation_Instance { get; private set; }
 
         static EditorCompilationWrapper()
@@ -82,8 +84,13 @@ namespace ScriptHotReload
                     miCreateScriptAssemblySettings = mi;
                 else if (mi.Name == "CompileScripts" && mi.GetParameters().Length >= 5) // 2019:6, 2020:5
                     miCompileScripts = mi;
+                else if (mi.Name == "SetCompileScriptsOutputDirectory")
+                    miSetCompileScriptsOutputDirectory = mi;
             }
             miScriptSettings_SetOutputDirectory = tScriptAssemblySettings.GetProperty("OutputDirectory", BindingFlags.Public | BindingFlags.Instance).GetSetMethod();
+            
+            
+            
             miRequestScriptCompilation = tCompilationPipeline.GetMethod("RequestScriptCompilation", BindingFlags.Public | BindingFlags.Static);
             miDirtyAllScripts = tEditorCompilationInterface.GetMethod("DirtyAllScripts", BindingFlags.Public | BindingFlags.Static);
 
@@ -97,6 +104,7 @@ namespace ScriptHotReload
             {
                 (int)options, platfromGroup, platform, extraScriptingDefines
             });
+            
 #else
             CompileStatus ret = (CompileStatus)miTickCompilationPipeline.Invoke(null, new object[]
             {
@@ -122,6 +130,9 @@ namespace ScriptHotReload
         {
 #if UNITY_2020_1_OR_NEWER
             var param = CompileScript.editorBuildParams;
+
+            miSetCompileScriptsOutputDirectory.Invoke(EditorCompilation_Instance, new object[]{param.outputDir});
+
             CompileStatus ret =  (CompileStatus)miCompileScripts.Invoke(EditorCompilation_Instance, new object[] 
             {
                 (int)param.options, param.platformGroup, param.platform, param.extraScriptingDefines, /*StopOnFirstError*/1
@@ -143,9 +154,14 @@ namespace ScriptHotReload
 
         public static void DirtyAllScripts()
         {
-            miDirtyAllScripts.Invoke(null, new object[] { });
+            // miDirtyAllScripts.Invoke(null, new object[] { }); return;
+            var method = tEditorCompilation.GetMethod("DirtyScript", BindingFlags.Public | BindingFlags.Instance);
+            method.Invoke(EditorCompilation_Instance, new[]
+            {
+                "Assets/Scripts/TestDllA/TestDllA_Main.cs",
+                "TestDllA.dll"
+            });
         }
     }
-
 }
 #endif

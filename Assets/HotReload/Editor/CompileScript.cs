@@ -59,8 +59,15 @@ namespace ScriptHotReload
             object scriptAssemblySettings = EditorCompilationWrapper.CreateScriptAssemblySettings(
                 editorBuildParams.platformGroup, editorBuildParams.platform, editorBuildParams.options, editorBuildParams.extraScriptingDefines, outputDir);
             
-            Directory.CreateDirectory(outputDir);
             RemoveAllFiles(outputDir);
+            var dest = @"C:\Users\Admin\Documents\handanzhang\NewUnityProject\Temp\ScriptHotReload\tmp";
+            if (Directory.Exists(dest))
+            {
+                Directory.Delete(dest, true);
+            }
+            FileUtil.CopyFileOrDirectory(@"C:\Users\Admin\Documents\handanzhang\NewUnityProject\Library\ScriptAssemblies", dest);
+
+            Directory.CreateDirectory(outputDir);
             EditorCompilationWrapper.DirtyAllScripts();
             var status = EditorCompilationWrapper.CompileScriptsWithSettings(scriptAssemblySettings);
             Debug.Log($"开始编译dll到目录: {outputDir}");
@@ -82,6 +89,9 @@ namespace ScriptHotReload
 
             EditorApplication.update += EditorApplication_Update;
         }
+        
+        
+        
 
         static void EditorApplication_Update()
         {

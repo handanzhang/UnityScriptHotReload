@@ -15,7 +15,7 @@ namespace ScriptHotReload
         /// </summary>
         public static List<string> hotReloadAssemblies = new List<string>()
         {
-            "Assembly-CSharp.dll",
+            "HotReload.dll",
             "TestDllA.dll"
         };
 

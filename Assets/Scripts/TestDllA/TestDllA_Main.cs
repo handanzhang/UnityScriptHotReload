@@ -1,4 +1,4 @@
-﻿//#define APPLY_PATCH
+﻿#define APPLY_PATCH
 
 using System;
 using System.Collections;
@@ -52,6 +52,8 @@ namespace NS_Test
         private InnerTest _innerTest = new InnerTest();
         private TestClsG<TestCls>.TestClsGInner<TestDll_2> _genericFiledTest;
 
+        public Guid ggg;
+        
         public Action<int> act = x =>
         {
             x += 2;
@@ -67,7 +69,13 @@ namespace NS_Test
 
         public TestCls(GameObject go)
         {
+            Debug.LogWarning($"{go.GetComponent<MonoTestA>() != null}");
+            
+            
             _go = go;
+            
+            Debug.LogWarning($"{_go == go}, {_go.GetComponent<MonoTestA>() != null}, {go.GetComponent<MonoTestA>() != null}");
+            
         }
 
         public void Init()
@@ -118,30 +126,33 @@ namespace NS_Test
 
         public void FuncA(out int val)
         {
-            val = 2000;
-            Func<int, bool> f = (int x) => { Debug.Log($"{x + 1}-{str}..."); return x > 101; };
-            Debug.Log($"x is OK:{f(val + 2)}");
+            val = 999999999;
+            // Debug.LogWarning("<color=red>123123</color>");
+            //
+            // val = 2000;
+            // Func<int, bool> f = (int x) => { Debug.Log($"{x + 1}-{str}..."); return x > 101; };
+            // Debug.Log($"x is OK:{f(val + 2)}");
             TestB();
-            TestC();
-            Debug.Log($"Test4.val={Test4.val} from Test()");
-            str = "be happy";
-            Debug.Log(str2);
-            FuncNew();
-
-            _innerTest.FuncInnerA(5);
-
-            int valB = TestDllB_Main.Calc(1, 6);
-            Debug.Log($"valB from Ref dll = {valB}");
-
-            var newCls = new NewTestClass();
-            newCls.x = 1;
-            Debug.Log($"NewTestClass.Add:{newCls.Add(3)}");
-
-            var test2 = new TestDll_2();
-            int z = test2.Mul_2(5, 6);
-            Debug.Log($"test2={z}");
-
-            PrintMethodLocation(MethodBase.GetCurrentMethod());
+            // TestC();
+            // Debug.Log($"Test4.val={Test4.val} from Test()");
+            // str = "be happy!!!!!!";
+            // Debug.Log(str2);
+            // FuncNew();
+            //
+            // _innerTest.FuncInnerA(5);
+            //
+            // int valB = TestDllB_Main.Calc(1, 6);
+            // Debug.Log($"valB from Ref dll = {valB}");
+            //
+            // var newCls = new NewTestClass();
+            // newCls.x = 1;
+            // Debug.Log($"NewTestClass.Add:{newCls.Add(3)}");
+            //
+            // var test2 = new TestDll_2();
+            // int z = test2.Mul_2(5, 6);
+            // Debug.Log($"test2={z+2+1+10000}");
+            //
+            // PrintMethodLocation(MethodBase.GetCurrentMethod());
         }
         public void FuncNew()
         {
@@ -191,10 +202,18 @@ namespace NS_Test
             var tmpGenericObj = new TestClsG<TestCls>.TestClsGInner<TestDll_2>();
             Func<TestCls, string, TestDll_2, TestDll_2> funcG = tmpGenericObj.FuncG;
             var val3 = funcG(this, "test words 2", null);
-
-
+            
             var comp = _go.GetComponent<MonoTestA>();
-            comp.ShowText();
+            if (comp != null)
+            {
+                Debug.LogWarning($"mono test A exists ++ ");
+            }
+
+            if (_go.GetComponent<Camera>() != null)
+            {
+                Debug.LogWarning($"camera exists ++ !!!");
+            }
+            
             PrintMethodLocation(MethodBase.GetCurrentMethod());
         }
 

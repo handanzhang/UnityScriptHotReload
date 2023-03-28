@@ -19,8 +19,11 @@ public class Test : MonoBehaviour
     void OnBtnTest()
     {
         Debug.Log($"Test3.s_val={NS_Test.TestCls.s_val}");
+        Debug.LogWarning($"exist={gameObject.GetComponent<MonoTestA>() != null}");
 
+        
         var test = new NS_Test.TestCls(gameObject);
+
         test.FuncA(out int val);
         Debug.Log($"OnBtnTest:val={val}");
 
