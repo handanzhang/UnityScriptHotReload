@@ -1,13 +1,9 @@
 #if ENABLE_HOOK_TEST_CASE || true
 /*
- * ¶Ô Transform.SetPosition ½øÐÐhookµÄ²âÊÔÓÃÀý
+ * å¯¹ Transform.SetPosition è¿›è¡Œhookçš„æµ‹è¯•ç”¨ä¾‹
  */
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using UnityEditor;
 using UnityEngine;
 
 namespace MonoHook.Test
@@ -26,11 +22,11 @@ namespace MonoHook.Test
         {
             if (_hook == null)
             {
-                Type type = typeof(Transform);
-                MethodInfo miTarget = type.GetMethod("set_position_Injected", BindingFlags.Instance | BindingFlags.NonPublic);
+                var type = typeof(Transform);
+                var miTarget = type.GetMethod("set_position_Injected", BindingFlags.Instance | BindingFlags.NonPublic);
 
-                MethodInfo miReplacement = typeof(Transform_SetPosition_HookTest).GetMethod("SetPositionNew", BindingFlags.Static | BindingFlags.NonPublic);
-                MethodInfo miProxy = typeof(Transform_SetPosition_HookTest).GetMethod("SetPositionProxy", BindingFlags.Static | BindingFlags.NonPublic);
+                var miReplacement = typeof(Transform_SetPosition_HookTest).GetMethod("SetPositionNew", BindingFlags.Static | BindingFlags.NonPublic);
+                var miProxy = typeof(Transform_SetPosition_HookTest).GetMethod("SetPositionProxy", BindingFlags.Static | BindingFlags.NonPublic);
 
                 _hook = new MethodHook(miTarget, miReplacement, miProxy);
                 _hook.Install();
@@ -48,7 +44,7 @@ namespace MonoHook.Test
         private static void SetPositionProxy(Transform t, ref Vector3 value)
         {
             // dummy code
-            Debug.Log("something" + t.ToString());
+            Debug.Log("something" + t);
         }
     }
 }

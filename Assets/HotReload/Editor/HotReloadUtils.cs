@@ -3,16 +3,13 @@
  * email: easy66@live.com
  * github: https://github.com/Misaka-Mikoto-Tech/UnityScriptHotReload
  */
-using System.Collections;
+
+using System;
 using System.Collections.Generic;
 using System.IO;
-using UnityEngine;
-using System.Security.Cryptography;
-using System;
 using System.Reflection;
-using UnityEditor;
-using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 
 namespace ScriptHotReload
 {
@@ -23,8 +20,8 @@ namespace ScriptHotReload
             if (!File.Exists(lpath) || !File.Exists(rpath))
                 return false;
 
-            long lLen = new FileInfo(lpath).Length;
-            long rLen = new FileInfo(rpath).Length;
+            var lLen = new FileInfo(lpath).Length;
+            var rLen = new FileInfo(rpath).Length;
             if (lLen != rLen)
                 return false;
 
@@ -43,7 +40,10 @@ namespace ScriptHotReload
                     fileMd5 = BitConverter.ToString(md5Bytes).Replace("-", "").ToLower();
                 }
             }
-            catch { }
+            catch
+            {
+            }
+
             return fileMd5;
         }
 
@@ -52,14 +52,14 @@ namespace ScriptHotReload
             if (!Directory.Exists(dir))
                 return;
 
-            string[] files = Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories);
+            var files = Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories);
             foreach (var file in files)
                 File.Delete(file);
         }
 
         public static BindingFlags BuildBindingFlags(MethodBase methodInfo)
         {
-            BindingFlags flags = BindingFlags.Default;
+            var flags = BindingFlags.Default;
             if (methodInfo.IsPublic)
                 flags |= BindingFlags.Public;
             else
@@ -74,52 +74,48 @@ namespace ScriptHotReload
         }
 
         /// <summary>
-        /// 从指定Assembly中查找特定签名的方法
+        ///     从指定Assembly中查找特定签名的方法
         /// </summary>
         /// <param name="methodBase"></param>
         /// <param name="assembly"></param>
         /// <returns></returns>
         public static MethodBase GetMethodFromAssembly(MethodBase methodBase, Assembly assembly)
         {
-            string typeName = methodBase.DeclaringType.FullName;
-            Type t = assembly.GetType(typeName);
+            var typeName = methodBase.DeclaringType.FullName;
+            var t = assembly.GetType(typeName);
             if (t == null)
                 return null;
 
             var flags = BuildBindingFlags(methodBase);
-            string sig = methodBase.ToString();
-            MethodBase[] mis = (methodBase is ConstructorInfo) ? (MethodBase[])t.GetConstructors(flags) : t.GetMethods(flags);
+            var sig = methodBase.ToString();
+            var mis = methodBase is ConstructorInfo ? (MethodBase[]) t.GetConstructors(flags) : t.GetMethods(flags);
 
-            foreach(var mi in mis)
-            {
+            foreach (var mi in mis)
                 if (mi.ToString() == sig)
                     return mi;
-            }
             return null;
         }
 
         private static string GetTypeName(Type t)
         {
             if (t.ContainsGenericParameters)
-            {
                 return t.Name;
-            }
-            else
-                return t.ToString().Replace('+', '/').Replace('[', '<').Replace(']', '>').Replace("<>", "[]"); // 最后一步是还原数组的[]
+            return t.ToString().Replace('+', '/').Replace('[', '<').Replace(']', '>').Replace("<>", "[]"); // 最后一步是还原数组的[]
         }
 
         public static Dictionary<string, string> GetFallbackAssemblyPaths()
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             var ret = new Dictionary<string, string>();
-            foreach(var ass in assemblies)
+            foreach (var ass in assemblies)
             {
                 if (ass.IsDynamic)
                     continue;
 
-                if(!string.IsNullOrEmpty(ass.Location))
+                if (!string.IsNullOrEmpty(ass.Location))
                     ret.TryAdd(Path.GetFileNameWithoutExtension(ass.Location), ass.Location);
             }
+
             return ret;
         }
 

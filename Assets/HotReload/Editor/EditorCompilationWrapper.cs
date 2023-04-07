@@ -3,6 +3,7 @@
  * email: easy66@live.com
  * github: https://github.com/Misaka-Mikoto-Tech/UnityScriptHotReload
  */
+
 #if UNITY_2021_2_OR_NEWER
 using System;
 using System.Collections;
@@ -26,18 +27,18 @@ namespace ScriptHotReload
     [Flags]
     public enum EditorScriptCompilationOptions
     {
-        BuildingEmpty                               = 0,
-        BuildingDevelopmentBuild                    = 1 << 0,
-        BuildingForEditor                           = 1 << 1,
-        BuildingEditorOnlyAssembly                  = 1 << 2,
-        BuildingForIl2Cpp                           = 1 << 3,
-        BuildingWithAsserts                         = 1 << 4,
-        BuildingIncludingTestAssemblies             = 1 << 5,
+        BuildingEmpty = 0,
+        BuildingDevelopmentBuild = 1 << 0,
+        BuildingForEditor = 1 << 1,
+        BuildingEditorOnlyAssembly = 1 << 2,
+        BuildingForIl2Cpp = 1 << 3,
+        BuildingWithAsserts = 1 << 4,
+        BuildingIncludingTestAssemblies = 1 << 5,
         BuildingPredefinedAssembliesAllowUnsafeCode = 1 << 6,
-        BuildingForHeadlessPlayer                   = 1 << 7,
-        BuildingUseDeterministicCompilation         = 1 << 9,
-        BuildingWithRoslynAnalysis                  = 1 << 10,
-        BuildingWithoutScriptUpdater                = 1 << 11
+        BuildingForHeadlessPlayer = 1 << 7,
+        BuildingUseDeterministicCompilation = 1 << 9,
+        BuildingWithRoslynAnalysis = 1 << 10,
+        BuildingWithoutScriptUpdater = 1 << 11
     }
 
     /// <summary>
@@ -114,7 +115,7 @@ namespace ScriptHotReload
 
         public static CompileStatus CompileScriptsWithSettings(object scriptAssemblySettings)
         {
-            CompileStatus ret =  (CompileStatus)miCompileScriptsWithSettings.Invoke(EditorCompilation_Instance, new object[] { scriptAssemblySettings });
+            CompileStatus ret = (CompileStatus)miCompileScriptsWithSettings.Invoke(EditorCompilation_Instance, new object[] { scriptAssemblySettings });
             return ret;
         }
 

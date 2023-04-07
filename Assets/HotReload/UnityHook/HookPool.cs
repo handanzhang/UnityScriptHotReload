@@ -1,21 +1,17 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
-using UnityEngine;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.IO;
+using System.Reflection;
 #if UNITY_EDITOR
-using UnityEditor;
 #endif
 
 namespace MonoHook
 {
     /// <summary>
-    /// Hook 池，防止重复 Hook
+    ///     Hook 池，防止重复 Hook
     /// </summary>
     public static class HookPool
     {
-        private static Dictionary<MethodBase, MethodHook> _hooks = new Dictionary<MethodBase, MethodHook>();
+        private static readonly Dictionary<MethodBase, MethodHook> _hooks = new Dictionary<MethodBase, MethodHook>();
 
         public static void AddHook(MethodBase method, MethodHook hook)
         {
@@ -26,7 +22,9 @@ namespace MonoHook
                 _hooks[method] = hook;
             }
             else
+            {
                 _hooks.Add(method, hook);
+            }
         }
 
         public static MethodHook GetHook(MethodBase method)
@@ -59,10 +57,8 @@ namespace MonoHook
         {
             var list = _hooks.Values.ToList();
             foreach (var hook in list)
-            {
-                if(hook.tag == tag)
+                if (hook.tag == tag)
                     hook.Uninstall();
-            }
         }
 
         public static List<MethodHook> GetAllHooks()
@@ -70,5 +66,4 @@ namespace MonoHook
             return _hooks.Values.ToList();
         }
     }
-
 }

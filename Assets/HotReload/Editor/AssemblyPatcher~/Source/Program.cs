@@ -1,7 +1,10 @@
-﻿using System.Diagnostics;
+using System;
+using System.Diagnostics;
+using System.IO;
 using System.Text;
 
-namespace AssemblyPatcher;
+namespace AssemblyPatcher
+{
 
 internal class Program
 {
@@ -48,4 +51,5 @@ internal class Program
         Debug.Log("Patch成功");
         return 0;
     }
+}
 }

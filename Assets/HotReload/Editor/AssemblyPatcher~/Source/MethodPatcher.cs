@@ -1,4 +1,4 @@
-﻿using Mono.Cecil;
+using Mono.Cecil;
 using Mono.Cecil.Cil;
 using System;
 using System.Collections.Generic;
@@ -13,11 +13,132 @@ using OpCodes = Mono.Cecil.Cil.OpCodes;
 using NHibernate.Mapping;
 using System.Runtime.CompilerServices;
 
-namespace AssemblyPatcher;
+namespace AssemblyPatcher
+{
 
+ 
 public class MethodPatcher
 {
-    AssemblyData _assemblyData;
+    private TypeReference Switch(TypeReference typeRef)
+    {
+        // 方案开始不支持lambda的修改
+        if(IsLambdaStaticType(typeRef))
+        {
+            return typeRef;
+        }
+
+        // 如果能在new中找到对应的def，那就new一个新的type，完全替换，找不到就只替换泛型参数
+        if(typeRef is GenericInstanceType gType)
+        {
+            GenericInstanceType returnType = gType;
+            var list = gType.GenericArguments.ToList();
+
+            if (gType.Resolve() != null && _assemblyData.baseTypes.TryGetValue(typeRef.Resolve().FullName, out var baseDef))
+            {
+                var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
+                returnType = new GenericInstanceType(oldRef);
+            }
+            returnType.GenericArguments.Clear();
+            foreach (var a in list)
+            {
+                returnType.GenericArguments.Add(Switch(a));
+            }
+            return returnType;
+        }
+        else
+        {
+            var def = typeRef.Resolve();
+            if (def != null && _assemblyData.baseTypes.TryGetValue(def.ToString(), out var baseDef))
+            {
+                var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
+                return oldRef ?? typeRef;
+            }
+            else
+            {
+                return typeRef;
+            }
+        }
+    }
+
+    //TODO 这里处理了新增情况， 以后有时间再看
+    private void FieldDefineProcess(FieldDefinition fieldDef, Instruction ins, ILProcessor ilProcessor, MethodFixStatus fixStatus, Dictionary<MethodDefinition, MethodFixStatus> processed, int depth)
+    {
+        var fieldType = fieldDef.DeclaringType;
+        if (fieldType.Module != _assemblyData.newAssDef.MainModule) 
+            return;
+
+        bool isLambda = IsLambdaStaticType(fieldType);
+        if (!isLambda && _assemblyData.baseTypes.TryGetValue(fieldType.FullName, out TypeData baseTypeData))
+        {
+            if (baseTypeData.fields.TryGetValue(fieldDef.FullName, out FieldDefinition baseFieldDef))
+            {
+                var fieldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseFieldDef);
+                var newIns = Instruction.Create(ins.OpCode, fieldRef);
+                ilProcessor.Replace(ins, newIns);
+                fixStatus.ilFixed = true;
+            }
+            else
+                throw new Exception($"can not find field {fieldDef.FullName} in base dll");
+        }
+        else
+        {
+            // 新定义的类型或者lambda, 可以使用新的Assembly内的定义, 但需要递归修正其中的方法
+            if (_assemblyData.newTypes.TryGetValue(fieldType.ToString(), out TypeData typeData))
+            {
+                foreach (var kv in typeData.methods)
+                {
+                    PatchMethod(kv.Value.definition, processed, depth + 1);
+                }
+            }
+        }
+    }
+
+    private void MethodProcess(MethodReference mRef)
+    {
+            try
+            {
+                mRef.DeclaringType = Switch(mRef.DeclaringType);
+
+            }catch(Exception e)
+            {
+                Debug.Log($"{mRef.Name}, {mRef.DeclaringType.Name},  {mRef.Module.Name}");
+            }
+
+        if (mRef.IsGenericInstance)
+        {
+            var gMethod = mRef as GenericInstanceMethod;
+            var GAArgs = gMethod.GenericArguments;
+
+            var list = GAArgs.ToList();
+            GAArgs.Clear();
+            foreach (var a in list)
+            {
+                GAArgs.Add(Switch(a));
+            }
+        }
+
+        if (mRef.Parameters.Count > 0)
+        {
+            var pTypes = mRef.Parameters;
+            foreach (var a in pTypes)
+            {
+                a.ParameterType = Switch(a.ParameterType);
+            }
+        }
+
+        if (mRef.GenericParameters.Count > 0)
+        {
+            var GPTypes = mRef.GenericParameters;
+            foreach (var a in GPTypes)
+            {
+                a.DeclaringType = Switch(a);
+            }
+        }
+
+        mRef.ReturnType = Switch(mRef.ReturnType);
+    }
+
+        AssemblyData _assemblyData;
     public MethodPatcher(AssemblyData assemblyData)
     {
         _assemblyData = assemblyData;
@@ -38,6 +159,8 @@ public class MethodPatcher
         if (_assemblyData.methodsNeedHook.ContainsKey(sig))
             fixStatus.needHook = true;
 
+            var print = definition.Name == "TestB";
+
         // 参数和返回值由于之前已经检查过名称是否一致，因此是二进制兼容的，可以不进行检查
 
         var arrIns = definition.Body.Instructions.ToArray();
@@ -45,6 +168,7 @@ public class MethodPatcher
 
         for (int i = 0, imax = arrIns.Length; i < imax; i++)
         {
+
             Instruction ins = arrIns[i];
             /*
                 * Field 有两种类型: FieldReference/FieldDefinition, 经过研究发现 FieldReference 指向了当前类型外部的定义（当前Assembly或者引用的Assembly）, 
@@ -52,93 +176,107 @@ public class MethodPatcher
                 * 因此我们需要检查 FieldDefinition 和 FieldReference, 把它们都替换成原始 Assembly 内同名的 FieldReference
                 * Method/Type 同理, 但 lambda 表达式不进行替换，而是递归修正函数
                 */
+                
             if (ins.Operand == null)
                 continue;
 
-            switch(ins.Operand)
+            if (ins.Operand is TypeDefinition typeDef)
             {
-                case string constStr:
-                    break;
-                case TypeDefinition typeDef:
-                    break;
-                case FieldDefinition fieldDef:
+                // 类型定义，直接替换吧
+                if (IsLambdaStaticType(typeDef))
+                {
+                    continue;
+                }
+                else
+                {
+                    if (_assemblyData.baseTypes.TryGetValue(typeDef.ToString(), out var baseDef))
                     {
-                        var fieldType = fieldDef.DeclaringType;
-                        if (fieldType.Module != _assemblyData.newAssDef.MainModule) break;
-
-                        bool isLambda = IsLambdaStaticType(fieldType);
-                        if (!isLambda && _assemblyData.baseTypes.TryGetValue(fieldType.FullName, out TypeData baseTypeData))
-                        {
-                            if (baseTypeData.fields.TryGetValue(fieldDef.FullName, out FieldDefinition baseFieldDef))
-                            {
-                                var fieldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseFieldDef);
-                                var newIns = Instruction.Create(ins.OpCode, fieldRef);
-                                ilProcessor.Replace(ins, newIns);
-                                fixStatus.ilFixed = true;
-                            }
-                            else
-                                throw new Exception($"can not find field {fieldDef.FullName} in base dll");
-                        }
-                        else
-                        {
-                            // 新定义的类型或者lambda, 可以使用新的Assembly内的定义, 但需要递归修正其中的方法
-                            if (_assemblyData.newTypes.TryGetValue(fieldType.ToString(), out TypeData typeData))
-                            {
-                                foreach (var kv in typeData.methods)
-                                {
-                                    PatchMethod(kv.Value.definition, processed, depth + 1);
-                                }
-                            }
-                        }
+                        var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
+                        ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, oldRef));
+                        fixStatus.ilFixed = true;
                     }
-                    break;
-                case MethodDefinition methodDef:
+                }
+
+            }
+            else if (ins.Operand is TypeReference)
+            {
+                var operand = ins.Operand as TypeReference;
+                var typeRef = Switch(operand);
+                ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, typeRef));
+                fixStatus.ilFixed = true;
+            }
+
+            else if (ins.Operand is FieldDefinition fDef)
+            {
+                if(!IsLambdaStaticType(fDef.DeclaringType))
+                {
+                    if (_assemblyData.baseTypes.TryGetValue(fDef.DeclaringType.FullName, out TypeData baseData))
                     {
-                        bool isLambda = IsLambdaMethod(methodDef);
-                        if (!isLambda && _assemblyData.allBaseMethods.TryGetValue(methodDef.ToString(), out MethodData baseMethodDef))
+                        if (baseData.fields.TryGetValue(fDef.FullName, out FieldDefinition baseField))
                         {
-                            var reference = _assemblyData.newAssDef.MainModule.ImportReference(baseMethodDef.definition);
-                            var newIns = Instruction.Create(ins.OpCode, reference);
-                            ilProcessor.Replace(ins, newIns);
+                            var fieldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseField);
+                            ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, fieldRef));
                             fixStatus.ilFixed = true;
                         }
-                        else // 这是新定义的方法或者lambda表达式，需要递归修正
-                        {
-                            PatchMethod(methodDef, processed, depth + 1); // TODO 当object由非hook代码创建时调用新添加的虚方法可能有问题
-                        }
                     }
-                    break;
-                case GenericInstanceType gTypeDef:
-                    {
-                        var t = GetBaseInstanceType(gTypeDef);
-                    }
-                    break;
-                case GenericInstanceMethod gMethodDef:
-                    {
-                        var m = GetBaseInstanceMethod(gMethodDef);
-                    }
-                    break;
-                case TypeReference typeRef:
-                    if (!IsDefInCurrentAssembly(typeRef))
-                        break;
+                }
+            }
 
-                    break;
-                case FieldReference fieldRef:
-                    if (!IsDefInCurrentAssembly(fieldRef))
-                        break;
-
-                    break;
-                case MethodReference methodRef:
-                    if (!IsDefInCurrentAssembly(methodRef))
-                        break;
-
-                    break;
-                default:
+            else if (ins.Operand is FieldReference fRef)
+            {
+                var def = fRef.Resolve();
+                if (def != null && _assemblyData.baseTypes.TryGetValue(def.DeclaringType.FullName, out var baseDef))
+                {
+                    // 新增字段，不处理
+                    if (baseDef.fields.TryGetValue(def.ToString(), out FieldDefinition baseField))
                     {
-                        Type t = ins.Operand?.GetType();
+                        var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseField);
+                        oldRef.DeclaringType = Switch(fRef.DeclaringType);
+                        ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, oldRef));
                     }
-                    break;
-            } // switch
+                }
+
+                else
+                {
+                    fRef.DeclaringType = Switch(fRef.DeclaringType);
+                }
+            }
+
+            else if (ins.Operand is MethodDefinition mDef)
+            {
+
+                if (IsLambdaMethod(mDef))
+                {
+                    //TODO lambda 或者新增
+                    //PatchMethod(methodDef, processed, depth + 1); // TODO 当object由非hook代码创建时调用新添加的虚方法可能有问题
+                    continue;
+                }
+                if ( _assemblyData.allBaseMethods.TryGetValue(mDef.ToString(), out MethodData baseMethodDef))
+                {
+                    var reference = _assemblyData.newAssDef.MainModule.ImportReference(baseMethodDef.definition);
+                    var newIns = Instruction.Create(ins.OpCode, reference);
+                    ilProcessor.Replace(ins, newIns);
+                    fixStatus.ilFixed = true;
+                }
+            }
+                
+            else if (ins.Operand is MethodReference mRef)
+            {
+
+                if(print)
+                    {
+                        Debug.Log($"{mRef.GetType()}");
+                    }
+                // reference 不存在新增。即时存在引用了新增的方法，也是先跳转老的，然后hook到新方法
+                MethodProcess(mRef);
+                fixStatus.ilFixed = true;
+            }
+
+            else
+            {
+                var t = ins.Operand?.GetType();
+            }
+
         } // for
 
         // 即使没有修改任何IL，也需要刷新pdb, 因此在头部给它加个nop
@@ -231,5 +369,7 @@ public class MethodPatcher
     {
         return methodRef.DeclaringType.Scope == _assemblyData.newAssDef.MainModule;
     }
+
+}
 
 }

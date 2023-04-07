@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Author: Misaka Mikoto
  * email: easy66@live.com
  * github: https://github.com/Misaka-Mikoto-Tech/UnityScriptHotReload
@@ -20,7 +20,10 @@ using System.Security.Permissions;
 using SecurityAction = System.Security.Permissions.SecurityAction;
 using OpCodes = Mono.Cecil.Cil.OpCodes;
 
-namespace AssemblyPatcher;
+namespace AssemblyPatcher
+{
+
+
 
 public class AssemblyData
 {
@@ -165,18 +168,18 @@ public class AssemblyDataBuilder
         foreach(var kvT in assemblyData.newTypes)
         {
             string typeName = kvT.Key;
-            TypeData typeData = kvT.Value;
+            TypeData newDllTypeData = kvT.Value;
 
             if (!assemblyData.baseTypes.ContainsKey(typeName))
             {
-                assemblyData.addedTypes.Add(typeName, typeData);
+                assemblyData.addedTypes.Add(typeName, newDllTypeData);
                 continue;
             }
 
             if (IsLambdaStaticType(typeName))
                 continue;
 
-            foreach(var kvM in typeData.methods)
+            foreach(var kvM in newDllTypeData.methods)
             {
                 var methodData = kvM.Value;
                 var doc = methodData.document;
@@ -586,3 +589,4 @@ class TypeDefComparer<T> : IComparer<T> where T : MemberReference
     }
 }
 
+}

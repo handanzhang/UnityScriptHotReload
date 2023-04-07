@@ -2,8 +2,8 @@
     "name": "HotReload",
     "rootNamespace": "",
     "references": [
-        "GUID:b89807aac9f04ab40a68f31bbf5b376e",
-        "GUID:57f5234d6891c8f45a207b202c58d0b9"
+        "TestDllA",
+        "TestDllB"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

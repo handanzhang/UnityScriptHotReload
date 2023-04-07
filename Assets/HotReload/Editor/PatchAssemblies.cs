@@ -6,25 +6,18 @@
 
 //#define PATCHER_DEBUG
 
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
-using static UnityEngine.GraphicsBuffer;
-using UnityEditor.Build.Player;
-using System.IO;
-using UnityEditor.Callbacks;
-using System.Reflection;
-using MonoHook;
-using System.Runtime.CompilerServices;
 using System;
-using System.Reflection.Emit;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
-
+using UnityEditor;
+using UnityEngine;
 using static ScriptHotReload.HotReloadUtils;
 using static ScriptHotReload.HotReloadConfig;
-using System.Diagnostics;
+using Debug = UnityEngine.Debug;
 
 namespace ScriptHotReload
 {
@@ -32,24 +25,42 @@ namespace ScriptHotReload
     {
         public static bool codeHasChanged => methodsToHook.Count > 0;
 
-        public static Dictionary<string, List<MethodBase>> methodsToHook { get; private set; } = new Dictionary<string, List<MethodBase>>();
+        public static Dictionary<string, List<MethodBase>> methodsToHook { get; } = new Dictionary<string, List<MethodBase>>();
 
-        public static int patchNo { get; private set; } = 0;
+        public static int patchNo { get; private set; }
 
         [InitializeOnLoadMethod]
-        static void Init()
+        private static void Init()
         {
             patchNo = 0;
             methodsToHook.Clear();
         }
 
-        [MenuItem("ScriptHotReload/PatchAssemblies")]
-        public static void DoGenPatchAssemblies()
+        public static void DoGenPatchAssemblies(bool dirtyAll, Dictionary<string, string> file2Dll)
         {
             if (!Application.isPlaying)
                 return;
 
             CompileScript.OnCompileSuccess = OnScriptCompileSuccess;
+            RemoveAllFiles(kTempCompileToDir);
+
+            if (dirtyAll)
+            {
+                EditorCompilationWrapper.DirtyAllScripts();
+            }
+            else
+            {
+                var dest = Path.Combine(Application.dataPath, "../Temp/ScriptHotReload/tmp");
+                if (Directory.Exists(dest)) Directory.Delete(dest, true);
+                var dInfo = new DirectoryInfo(dest);
+                if (dInfo.Parent.Exists == false)
+                {
+                    dInfo.Parent.Create();
+                }
+                FileUtil.CopyFileOrDirectory("Library/ScriptAssemblies", dInfo.FullName);
+                EditorCompilationWrapper.DirtyOndemand(file2Dll);
+            }
+            
             CompileScript.CompileScriptToDir(kTempCompileToDir);
         }
 
@@ -57,7 +68,6 @@ namespace ScriptHotReload
         {
             if (status != CompileStatus.Idle)
                 return;
-
             methodsToHook.Clear();
             GenPatcherInputArgsFile();
             if (RunAssemblyPatchProcess() != 0)
@@ -66,7 +76,7 @@ namespace ScriptHotReload
             ParseOutputReport();
             if (methodsToHook.Count == 0)
             {
-                UnityEngine.Debug.Log("代码没有发生改变，不执行热重载");
+                Debug.Log("代码没有发生改变，不执行热重载");
                 return;
             }
 
@@ -74,7 +84,26 @@ namespace ScriptHotReload
             if (methodsToHook.Count > 0)
                 patchNo++;
 
-            UnityEngine.Debug.Log("<color=yellow>热重载完成</color>");
+            Debug.Log("<color=yellow>热重载完成</color>");
+        }
+
+        [MenuItem("ScriptHotReload/ForceHook")]
+        public static void ForceHook()
+        {
+            methodsToHook.Clear();
+            ParseOutputReport();
+            if (methodsToHook.Count == 0)
+            {
+                Debug.Log("代码没有发生改变，不执行热重载");
+                return;
+            }
+
+            HookAssemblies.DoHook(methodsToHook);
+            if (methodsToHook.Count > 0)
+                patchNo++;
+
+            Debug.Log("<color=yellow>热重载完成</color>");
+            
         }
 
         private static int RunAssemblyPatchProcess()
@@ -92,46 +121,113 @@ namespace ScriptHotReload
             startInfo.RedirectStandardOutput = true;
             startInfo.RedirectStandardError = true;
             //startInfo.StandardInputEncoding = System.Text.UTF8Encoding.UTF8;
-            startInfo.StandardOutputEncoding = System.Text.UTF8Encoding.UTF8;
-            startInfo.StandardErrorEncoding = System.Text.UTF8Encoding.UTF8;
-            Process procPathcer = new Process();
+            startInfo.StandardOutputEncoding = Encoding.UTF8;
+            startInfo.StandardErrorEncoding = Encoding.UTF8;
+            var procPathcer = new Process();
             procPathcer.StartInfo = startInfo;
             procPathcer.Start();
 
             Action<StreamReader> outputProcMsgs = sr =>
             {
-                string line = sr.ReadLine();
+                var line = sr.ReadLine();
                 while (line != null)
                 {
                     line = line.Replace("<br/>", "\r\n");
                     if (line.StartsWith("[Info]"))
-                        UnityEngine.Debug.Log($"<color=lime>[Patcher] {line.Substring("[Info]".Length)}</color>");
+                        Debug.Log($"<color=lime>[Patcher] {line.Substring("[Info]".Length)}</color>");
                     else if (line.StartsWith("[Warning]"))
-                        UnityEngine.Debug.LogWarning($"<color=orange>[Patcher] {line.Substring("[Warning]".Length)}</color>");
+                        Debug.LogWarning($"<color=orange>[Patcher] {line.Substring("[Warning]".Length)}</color>");
                     else if (line.StartsWith("[Error]"))
-                        UnityEngine.Debug.LogError($"[Patcher] {line.Substring("[Error]".Length)}");
+                        Debug.LogError($"[Patcher] {line.Substring("[Error]".Length)}");
 
 #if PATCHER_DEBUG || true
                     else if (line.StartsWith("[Debug]"))
-                        UnityEngine.Debug.Log($"<color=yellow>[Patcher] {line.Substring("[Debug]".Length)}</color>");
+                        Debug.Log($"<color=yellow>[Patcher] {line.Substring("[Debug]".Length)}</color>");
 #endif
                     else
-                        UnityEngine.Debug.Log($"<color=white>[Patcher] {line}</color>");
+                        Debug.Log($"<color=white>[Patcher] {line}</color>");
 
                     line = sr.ReadLine();
                 }
             };
 
-            using (var sr = procPathcer.StandardOutput) { outputProcMsgs(sr); }
-            using (var sr = procPathcer.StandardError) { outputProcMsgs(sr); }
+            using (var sr = procPathcer.StandardOutput)
+            {
+                outputProcMsgs(sr);
+            }
 
-            int exitCode = -1;
+            using (var sr = procPathcer.StandardError)
+            {
+                outputProcMsgs(sr);
+            }
+
+            var exitCode = -1;
             if (procPathcer.WaitForExit(60 * 1000)) // 最长等待1分钟
                 exitCode = procPathcer.ExitCode;
             else
                 procPathcer.Kill();
 
             return exitCode;
+        }
+
+        private static void GenPatcherInputArgsFile()
+        {
+            var inputArgs = new InputArgs();
+            inputArgs.patchNo = patchNo;
+            inputArgs.workDir = Environment.CurrentDirectory;
+            inputArgs.assembliesToPatch = hotReloadAssemblies.ToArray();
+            inputArgs.patchAssemblyNameFmt = kPatchAssemblyName;
+            inputArgs.tempScriptDir = kTempScriptDir;
+            inputArgs.tempCompileToDir = kTempCompileToDir;
+            inputArgs.builtinAssembliesDir = kBuiltinAssembliesDir;
+            inputArgs.lastDllPathFmt = kLastDllPathFormat;
+            inputArgs.patchDllPathFmt = kPatchDllPathFormat;
+            inputArgs.lambdaWrapperBackend = kLambdaWrapperBackend;
+            inputArgs.fallbackAssemblyPathes = GetFallbackAssemblyPaths().Values.ToArray();
+
+            var jsonStr = JsonUtility.ToJson(inputArgs, true);
+            File.WriteAllText(kAssemblyPatcherInput, jsonStr);
+        }
+
+        private static void ParseOutputReport()
+        {
+            methodsToHook.Clear();
+
+            if (!File.Exists(kAssemblyPatcherOutput))
+                throw new Exception($"can not find output report file `{kAssemblyPatcherOutput}`");
+
+            var text = File.ReadAllText(kAssemblyPatcherOutput);
+            var outputReport = JsonUtility.FromJson<OutputReport>(text);
+
+            foreach (var assName in outputReport.assemblyChangedFromLast) methodsToHook.Add(assName, new List<MethodBase>());
+
+            foreach (var data in outputReport.methodsNeedHook)
+            {
+                if (data.isGeneric)
+                    continue;
+
+                var t = Type.GetType(data.type, true);
+
+                var flags = BindingFlags.Default;
+                flags |= data.isPublic ? BindingFlags.Public : BindingFlags.NonPublic;
+                flags |= data.isStatic ? BindingFlags.Static : BindingFlags.Instance;
+
+                var paramTypes = new Type[data.paramTypes.Length];
+                for (int i = 0, imax = paramTypes.Length; i < imax; i++) paramTypes[i] = Type.GetType(data.paramTypes[i], true);
+                MethodBase method;
+                if (data.isConstructor)
+                    method = t.GetConstructor(flags, null, paramTypes, null);
+                else
+                    method = t.GetMethod(data.name, flags, null, paramTypes, null);
+
+                if (method == null)
+                    throw new Exception($"can not find method `{data.name}`");
+
+                if (!methodsToHook.TryGetValue(data.assembly, out var list))
+                    throw new Exception($"unexpected assembly name `{data.assembly}`");
+
+                list.Add(method);
+            }
         }
 
         [Serializable]
@@ -151,28 +247,13 @@ namespace ScriptHotReload
             public string[] fallbackAssemblyPathes;
         }
 
-        static void GenPatcherInputArgsFile()
-        {
-            var inputArgs = new InputArgs();
-            inputArgs.patchNo = patchNo;
-            inputArgs.workDir = Environment.CurrentDirectory;
-            inputArgs.assembliesToPatch = hotReloadAssemblies.ToArray();
-            inputArgs.patchAssemblyNameFmt = kPatchAssemblyName;
-            inputArgs.tempScriptDir = kTempScriptDir;
-            inputArgs.tempCompileToDir = kTempCompileToDir;
-            inputArgs.builtinAssembliesDir = kBuiltinAssembliesDir;
-            inputArgs.lastDllPathFmt = kLastDllPathFormat;
-            inputArgs.patchDllPathFmt = kPatchDllPathFormat;
-            inputArgs.lambdaWrapperBackend = kLambdaWrapperBackend;
-            inputArgs.fallbackAssemblyPathes = GetFallbackAssemblyPaths().Values.ToArray();
-
-            string jsonStr = JsonUtility.ToJson(inputArgs, true);
-            File.WriteAllText(kAssemblyPatcherInput, jsonStr);
-        }
-
         [Serializable]
         public class OutputReport
         {
+            public int patchNo;
+            public string[] assemblyChangedFromLast;
+            public List<MethodData> methodsNeedHook;
+
             [Serializable]
             public class MethodData
             {
@@ -189,57 +270,6 @@ namespace ScriptHotReload
                 public string returnType;
                 public string[] paramTypes;
             }
-            public int patchNo;
-            public string[] assemblyChangedFromLast;
-            public List<MethodData> methodsNeedHook;
-        }
-
-        static void ParseOutputReport()
-        {
-            methodsToHook.Clear();
-
-            if (!File.Exists(kAssemblyPatcherOutput))
-                throw new Exception($"can not find output report file `{kAssemblyPatcherOutput}`");
-
-            string text = File.ReadAllText(kAssemblyPatcherOutput);
-            var outputReport = JsonUtility.FromJson<OutputReport>(text);
-
-            foreach(var assName in outputReport.assemblyChangedFromLast)
-            {
-                methodsToHook.Add(assName, new List<MethodBase>());
-            }
-
-            foreach(var data in outputReport.methodsNeedHook)
-            {
-                if (data.isGeneric)
-                    continue;
-
-                Type t = Type.GetType(data.type, true);
-
-                BindingFlags flags = BindingFlags.Default;
-                flags |= data.isPublic ? BindingFlags.Public : BindingFlags.NonPublic;
-                flags |= data.isStatic ? BindingFlags.Static : BindingFlags.Instance;
-
-                Type[] paramTypes = new Type[data.paramTypes.Length];
-                for(int i = 0, imax = paramTypes.Length; i < imax; i++)
-                {
-                    paramTypes[i] = Type.GetType(data.paramTypes[i], true);
-                }
-                MethodBase method;
-                if (data.isConstructor)
-                    method = t.GetConstructor(flags, null, paramTypes, null);
-                else
-                    method = t.GetMethod(data.name, flags, null, paramTypes, null);
-
-                if (method == null)
-                    throw new Exception($"can not find method `{data.name}`");
-
-                if(!methodsToHook.TryGetValue(data.assembly, out List<MethodBase> list))
-                    throw new Exception($"unexpected assembly name `{data.assembly}`");
-
-                list.Add(method);
-            }
         }
     }
-
 }

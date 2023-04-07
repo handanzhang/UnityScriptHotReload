@@ -1,5 +1,4 @@
 ﻿#if UNITY_4_7
-
 using UnityEngine;
 using System.Collections;
 

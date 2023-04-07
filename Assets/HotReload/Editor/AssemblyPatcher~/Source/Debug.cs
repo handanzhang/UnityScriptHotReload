@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AssemblyPatcher;
-
+namespace AssemblyPatcher
+{
 internal class Debug
 {
     public static void Log(string msg)
@@ -33,3 +33,5 @@ internal class Debug
         System.Diagnostics.Debug.Assert(condition);
     }
 }
+}
+

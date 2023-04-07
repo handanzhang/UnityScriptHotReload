@@ -1,19 +1,38 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class MonoTestA : MonoBehaviour
 {
     public Text text;
-    public void ShowText()
-    {
-        Debug.Log($"MonoTestA.ShowText: text is:\"{text.text}\"");
-    }
 
     // Update is called once per frame
-    void Update()
+    private void Update()
     {
-        
+    }
+
+    public void ShowText()
+    {
+        Debug.Log($"1111 MonoTestA.ShowText: text is:\"{text.text}\"");
+    }
+}
+
+namespace NS_Test
+{
+    public class NewClass
+    {
+        public static void Print()
+        {
+            Debug.Log("Hot Reload new Func");
+        }
+
+        public string ReturnStr()
+        {
+            return "XXXX";
+        }
+
+        public SubB GetB()
+        {
+            return new SubB();
+        }
     }
 }

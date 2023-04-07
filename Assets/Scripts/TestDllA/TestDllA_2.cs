@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
@@ -10,16 +8,20 @@ namespace NS_Test
     {
         public int Mul_2(int x, int y)
         {
-            PrintMethodLocation_2(MethodBase.GetCurrentMethod());
+#if APPLY_PATCH
+            Debug.Log("mul_2 hot reload!!!");
+#endif
+
+            var b = new SubB();
+            PrintMethodLocation_2(b.GetType().GetMethod("Print", BindingFlags.Instance | BindingFlags.Public));
             return x * y + 2;
         }
 
-        void PrintMethodLocation_2(MethodBase method)
+        private void PrintMethodLocation_2(MethodBase method)
         {
             var currMethod = MethodBase.GetCurrentMethod();
-            string assPath = method.DeclaringType.Assembly.Location.Substring(Environment.CurrentDirectory.Length + 1);
+            var assPath = method.DeclaringType.Assembly.Location.Substring(Environment.CurrentDirectory.Length + 1);
             Debug.Log($"location `<color=yellow>{method.Name}</color>` of current dll: <color=yellow>{assPath.Replace('\\', '/')}</color>");
         }
     }
 }
-

@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Permissions;
@@ -10,7 +11,8 @@ using Mono.Cecil;
 using SimpleJSON;
 using static AssemblyPatcher.Utils;
 
-namespace AssemblyPatcher;
+namespace AssemblyPatcher
+{
 
 public class Patcher
 {
@@ -159,4 +161,5 @@ public class Patcher
         File.WriteAllText(_outputFilePath, sb.ToString());
     }
 
+}
 }
