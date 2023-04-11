@@ -10,6 +10,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using UnityEngine;
 
 namespace ScriptHotReload
 {
@@ -113,7 +114,23 @@ namespace ScriptHotReload
                     continue;
 
                 if (!string.IsNullOrEmpty(ass.Location))
-                    ret.TryAdd(Path.GetFileNameWithoutExtension(ass.Location), ass.Location);
+                {
+                    var name = Path.GetFileNameWithoutExtension(ass.Location);
+                    if (name.Contains("_patch_"))
+                    {
+                        continue;
+                    }
+                    
+                    var prefix = Path.Combine(Application.dataPath, "../", HotReloadConfig.kTempCompileToDir);
+                    if (HotReloadConfig.hotReloadAssemblies.Contains(name + ".dll"))
+                    {
+                        ret.TryAdd(name, prefix + "/" + name);
+                    }
+                    else
+                    {
+                        ret.TryAdd(name, ass.Location);
+                    }
+                }
             }
 
             return ret;

@@ -60,7 +60,6 @@ namespace ScriptHotReload
                 FileUtil.CopyFileOrDirectory("Library/ScriptAssemblies", dInfo.FullName);
                 EditorCompilationWrapper.DirtyOndemand(file2Dll);
             }
-            
             CompileScript.CompileScriptToDir(kTempCompileToDir);
         }
 
@@ -219,9 +218,14 @@ namespace ScriptHotReload
                     method = t.GetConstructor(flags, null, paramTypes, null);
                 else
                     method = t.GetMethod(data.name, flags, null, paramTypes, null);
-
+                
+                Debug.Log($"[patch] {data.name}");
                 if (method == null)
-                    throw new Exception($"can not find method `{data.name}`");
+                {
+                    HookAssemblies.LogWarning($"add new method {data.name}");
+                    return;
+                }
+                    // throw new Exception($"can not find method `{data.name}`");
 
                 if (!methodsToHook.TryGetValue(data.assembly, out var list))
                     throw new Exception($"unexpected assembly name `{data.assembly}`");

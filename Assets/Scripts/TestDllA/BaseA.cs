@@ -8,12 +8,17 @@ namespace NS_Test
 
         public BaseA()
         {
-            Debug.LogWarning($"BaseA a: {a}, c: ");
+            Debug.LogWarning($"BaseA a: {a}, c: 1");
         }
 
         public virtual void Print()
         {
             Debug.Log("z virtual method");
+        }
+
+        public void FF()
+        {
+            Debug.Log("Print A");
         }
     }
 }

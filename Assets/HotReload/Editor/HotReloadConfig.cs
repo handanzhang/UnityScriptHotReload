@@ -35,7 +35,6 @@ namespace ScriptHotReload
         /// </summary>
         public static List<string> hotReloadAssemblies = new List<string>
         {
-            "TestDllA.dll"
         };
     }
 }

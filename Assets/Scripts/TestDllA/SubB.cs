@@ -7,7 +7,7 @@ namespace NS_Test
     {
         public SubB() : this(-100)
         {
-            Debug.LogWarning($"result a: {a}");
+            Debug.LogWarning($"result a: {a} XXX");
         }
 
 
@@ -17,15 +17,15 @@ namespace NS_Test
             Debug.LogWarning($"inner a: {a}");
         }
 
-        public void FFF()
+        public new void FF()
         {
-            a = 5;
-            Debug.Log(a);
+            Debug.Log("Sub B");
         }
         
         public override void Print()
         {
-            Debug.Log($"hot reload virtual method B {a}");
+            base.Print();
+            Debug.Log($"virtual method B {a}");
         }
     }
 }

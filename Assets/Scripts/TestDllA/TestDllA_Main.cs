@@ -87,13 +87,11 @@ namespace NS_Test
 
         public void FuncA(out int val)
         {
-
-            
             val = 2;
-            
             var bb = new SubB();
             bb.Print();
-
+            
+            
             Func<int, bool> f = x =>
             {
                 Debug.Log($"{x + 1}-{str}...");

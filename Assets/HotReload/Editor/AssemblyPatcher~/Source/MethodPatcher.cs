@@ -95,14 +95,14 @@ public class MethodPatcher
 
     private void MethodProcess(MethodReference mRef)
     {
-            try
-            {
-                mRef.DeclaringType = Switch(mRef.DeclaringType);
+        try
+        {
+            mRef.DeclaringType = Switch(mRef.DeclaringType);
 
-            }catch(Exception e)
-            {
-                Debug.Log($"{mRef.Name}, {mRef.DeclaringType.Name},  {mRef.Module.Name}");
-            }
+        }catch(Exception e)
+        {
+            Debug.Log($"{mRef.Name}, {mRef.DeclaringType.Name},  {mRef.Module.Name}");
+        }
 
         if (mRef.IsGenericInstance)
         {
@@ -258,15 +258,16 @@ public class MethodPatcher
                     ilProcessor.Replace(ins, newIns);
                     fixStatus.ilFixed = true;
                 }
+                if(_assemblyData.allNewMethods.TryGetValue(mDef.ToString(), out MethodData newMethodDef))
+                {
+                    MethodProcess(mDef);
+                    fixStatus.ilFixed = true;
+                }
             }
                 
             else if (ins.Operand is MethodReference mRef)
             {
 
-                if(print)
-                    {
-                        Debug.Log($"{mRef.GetType()}");
-                    }
                 // reference 不存在新增。即时存在引用了新增的方法，也是先跳转老的，然后hook到新方法
                 MethodProcess(mRef);
                 fixStatus.ilFixed = true;

@@ -76,11 +76,12 @@ public class Patcher
             if (IsFilesEqual(newDll, lastDll))
                 continue;
 
-            using (var baseAssDef = AssemblyDefinition.ReadAssembly(baseDll, baseReadParam))
+            using (var newAssDef = AssemblyDefinition.ReadAssembly(newDll, newReadParam))
             {
-                using (var newAssDef = AssemblyDefinition.ReadAssembly(newDll, newReadParam))
-                {
-                    var assBuilder = new AssemblyDataBuilder(baseAssDef, newAssDef);
+                using (var baseAssDef = AssemblyDefinition.ReadAssembly(baseDll, baseReadParam))
+
+                    {
+                        var assBuilder = new AssemblyDataBuilder(baseAssDef, newAssDef);
                     if (!assBuilder.DoBuild(_inputArgs.patchNo))
                     {
                         Debug.LogError($"[Error][{assName}]不符合热重载条件，停止重载");
@@ -91,7 +92,16 @@ public class Patcher
                     newAssDef.Write(patchDll, writeParam);
 
                     // 有可能数量为0，此时虽然与原始dll无差异，但是与上一次编译有差异，也需要处理（清除已hook函数）
-                    _methodsNeedHook.Add(assName, (from data in assBuilder.assemblyData.methodsNeedHook.Values select data.baseMethod).ToList());
+
+                        foreach(var val in assBuilder.assemblyData.methodsNeedHook.Values)
+                        {
+                            if(val.baseMethod != null)
+                            {
+                                val.newMethod.baseMethodData = val.baseMethod;
+                            }
+                        }
+
+                    _methodsNeedHook.Add(assName, (from data in assBuilder.assemblyData.methodsNeedHook.Values select data.newMethod).ToList());
 
                     File.Copy(newDll, lastDll, true);
                 }

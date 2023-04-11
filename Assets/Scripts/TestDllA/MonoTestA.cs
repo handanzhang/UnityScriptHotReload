@@ -22,7 +22,7 @@ namespace NS_Test
     {
         public static void Print()
         {
-            Debug.Log("Hot Reload new Func");
+            Debug.Log("Hot Reload new Func12");
         }
 
         public string ReturnStr()

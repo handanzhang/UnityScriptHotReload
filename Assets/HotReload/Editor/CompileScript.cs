@@ -8,10 +8,11 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using MonoHook;
 using UnityEditor;
+using UnityEditor.Compilation;
 using UnityEngine;
-using static ScriptHotReload.HotReloadUtils;
 
 namespace ScriptHotReload
 {
@@ -53,13 +54,41 @@ namespace ScriptHotReload
             var scriptAssemblySettings = EditorCompilationWrapper.CreateScriptAssemblySettings(
                 editorBuildParams.platformGroup, editorBuildParams.platform, editorBuildParams.options, editorBuildParams.extraScriptingDefines, outputDir);
 
-            var status = EditorCompilationWrapper.CompileScriptsWithSettings(scriptAssemblySettings);
+            CompilationPipeline.assemblyCompilationFinished -= AsmCompileResult;
+            CompilationPipeline.assemblyCompilationFinished += AsmCompileResult;
+
+            EditorApplication.update -= EditorApplication_Update;
+            EditorApplication.update += EditorApplication_Update;
+            
+            EditorCompilationWrapper.CompileScriptsWithSettings(scriptAssemblySettings);
             Debug.Log($"开始编译dll到目录: {outputDir}");
             s_CompileRequested = true;
+            
 
             ManualTickCompilationPipeline();
         }
 
+        public static void AsmCompileResult(string asm, CompilerMessage[] msgs)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"asm name: {asm}");
+
+            var hasError = false;
+            
+            foreach (var msg in msgs)
+            {
+                if (msg.type == CompilerMessageType.Error)
+                {
+                    sb.AppendLine(msg.message);
+                    hasError = true;
+                }
+            }
+
+            if (hasError)
+            {
+                Debug.LogError($"compile errors: {sb}");
+            }
+        }
 
         [UnityEditor.Callbacks.DidReloadScripts]
         private static void Init()
@@ -71,10 +100,7 @@ namespace ScriptHotReload
                 var miReplace = typeof(CompileScript).GetMethod(nameof(TickCompilationPipeline_Proxy), BindingFlags.NonPublic | BindingFlags.Static);
                 new MethodHook(miOri, miNew, miReplace).Install();
             }
-
-            EditorApplication.update += EditorApplication_Update;
         }
-
 
         private static void EditorApplication_Update()
         {
@@ -89,6 +115,8 @@ namespace ScriptHotReload
                     else
                         Debug.LogError($"编译失败:{compileStatus}");
 
+                    CompilationPipeline.assemblyCompilationFinished -= AsmCompileResult;
+                    EditorApplication.update -= EditorApplication_Update;
                     OnCompileSuccess?.Invoke(compileStatus);
                 }
                 else if (Application.isPlaying) // PlayMode 下Unity会停止调用 TickCompilationPipeline, 导致编译请求进度无法前进，所以需要我们手动去执行
