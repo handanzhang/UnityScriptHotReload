@@ -25,7 +25,7 @@ namespace NS_Test.TestCase
         public static void Test2()
         {
 #if ENABLE_OPEN_HOT_RELOAD
-            Debug.Log("load new function. succeed");
+            Debug.Log("load new function. succeed. jn game");
             XXX();
 #else
             if (s_lambda != null)
@@ -43,6 +43,7 @@ namespace NS_Test.TestCase
             {
                 s_lambda.Invoke(1000);
             } 
+            Debug.Log($"{str} .. do now");
         }
 #endif
 

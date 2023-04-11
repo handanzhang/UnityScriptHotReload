@@ -260,7 +260,7 @@ public class MethodPatcher
                 }
                 if(_assemblyData.allNewMethods.TryGetValue(mDef.ToString(), out MethodData newMethodDef))
                 {
-                    MethodProcess(mDef);
+                    //遇到新方法不处理
                     fixStatus.ilFixed = true;
                 }
             }
