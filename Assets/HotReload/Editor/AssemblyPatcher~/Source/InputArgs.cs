@@ -16,6 +16,7 @@ public class InputArgs
     public int patchNo;
     public string workDir;
     public string[] assembliesToPatch;
+    public string[] hookDocs;
     public string patchAssemblyNameFmt;
     public string tempScriptDir;
     public string tempCompileToDir;

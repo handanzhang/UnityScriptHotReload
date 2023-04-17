@@ -21,6 +21,8 @@ public class Patcher
     InputArgs _inputArgs;
     Dictionary<string, List<MethodData>> _methodsNeedHook = new Dictionary<string, List<MethodData>>();
 
+    public static List<string> asmList = new List<string>();
+
     public Patcher(string inputFilePath, string outputFilePath)
     {
         _inputFilePath = inputFilePath;
@@ -37,6 +39,9 @@ public class Patcher
             try
             {
                 Assembly.LoadFrom(kv.Value);
+
+                asmList.Add(Path.GetFileNameWithoutExtension(kv.Value));
+
             }
             catch(Exception ex)
             {
@@ -44,7 +49,7 @@ public class Patcher
             }
         }
         sw.Stop();
-        Console.WriteLine($"[Debug]载入相关dll耗时 {sw.ElapsedMilliseconds} ms");
+        Debug.Log($"载入相关dll耗时 {sw.ElapsedMilliseconds} ms");
     }
 
     public bool DoPatch()
@@ -79,9 +84,8 @@ public class Patcher
             using (var newAssDef = AssemblyDefinition.ReadAssembly(newDll, newReadParam))
             {
                 using (var baseAssDef = AssemblyDefinition.ReadAssembly(baseDll, baseReadParam))
-
-                    {
-                        var assBuilder = new AssemblyDataBuilder(baseAssDef, newAssDef);
+                {
+                    var assBuilder = new AssemblyDataBuilder(baseAssDef, newAssDef);
                     if (!assBuilder.DoBuild(_inputArgs.patchNo))
                     {
                         Debug.LogError($"[Error][{assName}]不符合热重载条件，停止重载");

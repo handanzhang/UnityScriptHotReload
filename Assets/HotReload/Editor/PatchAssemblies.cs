@@ -13,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using static ScriptHotReload.HotReloadUtils;
@@ -29,6 +30,8 @@ namespace ScriptHotReload
 
         public static int patchNo { get; private set; }
 
+        public static Dictionary<string, HashSet<string>> hookDll2Doc = new Dictionary<string, HashSet<string>>();
+
         [InitializeOnLoadMethod]
         private static void Init()
         {
@@ -36,7 +39,7 @@ namespace ScriptHotReload
             methodsToHook.Clear();
         }
 
-        public static void DoGenPatchAssemblies(bool dirtyAll, Dictionary<string, string> file2Dll)
+        public static void DoGenPatchAssemblies(bool dirtyAll, Dictionary<string, HashSet<string>> dll2Files)
         {
             if (!Application.isPlaying)
                 return;
@@ -53,12 +56,12 @@ namespace ScriptHotReload
                 var dest = Path.Combine(Application.dataPath, "../Temp/ScriptHotReload/tmp");
                 if (Directory.Exists(dest)) Directory.Delete(dest, true);
                 var dInfo = new DirectoryInfo(dest);
-                if (dInfo.Parent.Exists == false)
+                if (dInfo.Parent?.Exists == false)
                 {
                     dInfo.Parent.Create();
                 }
                 FileUtil.CopyFileOrDirectory("Library/ScriptAssemblies", dInfo.FullName);
-                EditorCompilationWrapper.DirtyOndemand(file2Dll);
+                EditorCompilationWrapper.DirtyOndemand(dll2Files);
             }
             CompileScript.CompileScriptToDir(kTempCompileToDir);
         }
@@ -83,7 +86,7 @@ namespace ScriptHotReload
             if (methodsToHook.Count > 0)
                 patchNo++;
 
-            Debug.Log("<color=yellow>热重载完成</color>");
+            Debug.Log($"<color=yellow>热重载完成 patch no: {patchNo}</color>");
         }
 
         [MenuItem("ScriptHotReload/ForceHook")]
@@ -174,7 +177,16 @@ namespace ScriptHotReload
             var inputArgs = new InputArgs();
             inputArgs.patchNo = patchNo;
             inputArgs.workDir = Environment.CurrentDirectory;
+
+            var docList = new List<string>();
+            foreach (var dll in hotReloadAssemblies)
+            {
+                docList.AddRange(hookDll2Doc[dll]);
+            }
+            docList.Add("[segmentation]");
+            
             inputArgs.assembliesToPatch = hotReloadAssemblies.ToArray();
+            inputArgs.hookDocs = docList.ToArray();
             inputArgs.patchAssemblyNameFmt = kPatchAssemblyName;
             inputArgs.tempScriptDir = kTempScriptDir;
             inputArgs.tempCompileToDir = kTempCompileToDir;
@@ -219,10 +231,9 @@ namespace ScriptHotReload
                 else
                     method = t.GetMethod(data.name, flags, null, paramTypes, null);
                 
-                Debug.Log($"[patch] {data.name}");
                 if (method == null)
                 {
-                    HookAssemblies.LogWarning($"add new method {data.name}");
+                    HookAssemblies.Log($"add new method {data.name}");
                     return;
                 }
                     // throw new Exception($"can not find method `{data.name}`");
@@ -240,6 +251,7 @@ namespace ScriptHotReload
             public int patchNo;
             public string workDir;
             public string[] assembliesToPatch;
+            public string[] hookDocs;
             public string patchAssemblyNameFmt;
             public string tempScriptDir;
             public string tempCompileToDir;

@@ -7,6 +7,7 @@
 #if !UNITY_2021_2_OR_NEWER
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using UnityEditor;
 
@@ -153,16 +154,18 @@ namespace ScriptHotReload
             
         }
 
-        public static void DirtyOndemand(Dictionary<string, string> path2Dll)
+        public static void DirtyOndemand(Dictionary<string, HashSet<string>> dll2Files)
         {
+            //public void DirtyScript(string path, string assemblyFilename)
             var method = tEditorCompilation.GetMethod("DirtyScript", BindingFlags.Public | BindingFlags.Instance);
 
-            foreach (var k in path2Dll)
+            foreach (var k in dll2Files)
             {
                 method.Invoke(EditorCompilation_Instance, new[]
                 {
-                    k.Key,
-                    k.Value
+                    k.Value.First(),
+                    k.Key
+                    
                 });    
             }
         }

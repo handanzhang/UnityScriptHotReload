@@ -3,14 +3,9 @@ using Mono.Cecil.Cil;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 using static AssemblyPatcher.Utils;
-using System.Security.Permissions;
-using SecurityAction = System.Security.Permissions.SecurityAction;
 using OpCodes = Mono.Cecil.Cil.OpCodes;
-using NHibernate.Mapping;
 using System.Runtime.CompilerServices;
 
 namespace AssemblyPatcher
@@ -19,7 +14,7 @@ namespace AssemblyPatcher
  
 public class MethodPatcher
 {
-    private TypeReference Switch(TypeReference typeRef)
+    public static TypeReference Switch(AssemblyData assemblyData ,TypeReference typeRef)
     {
         // 方案开始不支持lambda的修改
         if(IsLambdaStaticType(typeRef))
@@ -33,24 +28,24 @@ public class MethodPatcher
             GenericInstanceType returnType = gType;
             var list = gType.GenericArguments.ToList();
 
-            if (gType.Resolve() != null && _assemblyData.baseTypes.TryGetValue(typeRef.Resolve().FullName, out var baseDef))
+            if (gType.Resolve() != null && assemblyData.baseTypes.TryGetValue(typeRef.Resolve().FullName, out var baseDef))
             {
-                var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
+                var oldRef = assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
                 returnType = new GenericInstanceType(oldRef);
             }
             returnType.GenericArguments.Clear();
             foreach (var a in list)
             {
-                returnType.GenericArguments.Add(Switch(a));
+                returnType.GenericArguments.Add(Switch(assemblyData, a));
             }
             return returnType;
         }
         else
         {
             var def = typeRef.Resolve();
-            if (def != null && _assemblyData.baseTypes.TryGetValue(def.ToString(), out var baseDef))
+            if (def != null && assemblyData.baseTypes.TryGetValue(def.ToString(), out var baseDef))
             {
-                var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
+                var oldRef = assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
                 return oldRef ?? typeRef;
             }
             else
@@ -97,11 +92,11 @@ public class MethodPatcher
     {
         try
         {
-            mRef.DeclaringType = Switch(mRef.DeclaringType);
+            mRef.DeclaringType = Switch(_assemblyData, mRef.DeclaringType);
 
         }catch(Exception e)
         {
-            Debug.Log($"{mRef.Name}, {mRef.DeclaringType.Name},  {mRef.Module.Name}");
+            Debug.Log($"failed to set declaringType {mRef.Name}, {mRef.DeclaringType.Name},  {mRef.Module.Name}");
         }
 
         if (mRef.IsGenericInstance)
@@ -113,7 +108,7 @@ public class MethodPatcher
             GAArgs.Clear();
             foreach (var a in list)
             {
-                GAArgs.Add(Switch(a));
+                GAArgs.Add(Switch(_assemblyData, a));
             }
         }
 
@@ -122,7 +117,7 @@ public class MethodPatcher
             var pTypes = mRef.Parameters;
             foreach (var a in pTypes)
             {
-                a.ParameterType = Switch(a.ParameterType);
+                a.ParameterType = Switch(_assemblyData, a.ParameterType);
             }
         }
 
@@ -131,11 +126,11 @@ public class MethodPatcher
             var GPTypes = mRef.GenericParameters;
             foreach (var a in GPTypes)
             {
-                a.DeclaringType = Switch(a);
+                a.DeclaringType = Switch(_assemblyData, a);
             }
         }
 
-        mRef.ReturnType = Switch(mRef.ReturnType);
+        mRef.ReturnType = Switch(_assemblyData, mRef.ReturnType);
     }
 
         AssemblyData _assemblyData;
@@ -158,8 +153,6 @@ public class MethodPatcher
         var sig = definition.ToString();
         if (_assemblyData.methodsNeedHook.ContainsKey(sig))
             fixStatus.needHook = true;
-
-            var print = definition.Name == "TestB";
 
         // 参数和返回值由于之前已经检查过名称是否一致，因此是二进制兼容的，可以不进行检查
 
@@ -201,7 +194,7 @@ public class MethodPatcher
             else if (ins.Operand is TypeReference)
             {
                 var operand = ins.Operand as TypeReference;
-                var typeRef = Switch(operand);
+                var typeRef = Switch(_assemblyData, operand);
                 ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, typeRef));
                 fixStatus.ilFixed = true;
             }
@@ -231,14 +224,14 @@ public class MethodPatcher
                     if (baseDef.fields.TryGetValue(def.ToString(), out FieldDefinition baseField))
                     {
                         var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseField);
-                        oldRef.DeclaringType = Switch(fRef.DeclaringType);
+                        oldRef.DeclaringType = Switch(_assemblyData, fRef.DeclaringType);
                         ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, oldRef));
                     }
                 }
 
                 else
                 {
-                    fRef.DeclaringType = Switch(fRef.DeclaringType);
+                    fRef.DeclaringType = Switch(_assemblyData, fRef.DeclaringType);
                 }
             }
 
@@ -260,7 +253,8 @@ public class MethodPatcher
                 }
                 if(_assemblyData.allNewMethods.TryGetValue(mDef.ToString(), out MethodData newMethodDef))
                 {
-                    //遇到新方法不处理
+                    //遇到新方法，对实例的访问，改成static形式
+                    ilProcessor.Replace(ins, Instruction.Create(OpCodes.Call, mDef));
                     fixStatus.ilFixed = true;
                 }
             }

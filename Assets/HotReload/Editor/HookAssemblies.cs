@@ -22,12 +22,12 @@ namespace ScriptHotReload
 
         public static void Log(string s)
         {
-            Debug.Log($"[hot reload]<color=#00ECE5>{s}</color>");
+            Debug.Log($"[hot reload] <color=#00ECE5>{s}</color>");
         }
 
         public static void LogWarning(string s)
         {
-            Debug.Log($"[hot reload]<color=yellow>{s}</color>");
+            Debug.Log($"[hot reload] <color=yellow>{s}</color>");
         }
 
         public static void DoHook(Dictionary<string, List<MethodBase>> methodsToHook)
@@ -40,12 +40,7 @@ namespace ScriptHotReload
 
                 var patchAssPath = string.Format(kPatchDllPathFormat, Path.GetFileNameWithoutExtension(assName), GenPatchAssemblies.patchNo);
                 var patchAssembly = Assembly.LoadFrom(patchAssPath);
-                if (patchAssembly == null)
-                {
-                    Debug.LogError($"Dll Load Fail:{patchAssPath}");
-                    continue;
-                }
-
+                
                 foreach (var method in kv.Value)
                 {
                     var miTarget = method;
@@ -64,7 +59,7 @@ namespace ScriptHotReload
                     {
                         new MethodHook(miTarget, miReplace, null, hookTag).Install();
                     }
-                    catch (BadImageFormatException exception)
+                    catch (Exception exception)
                     {
                         Debug.LogError(exception);
                     }

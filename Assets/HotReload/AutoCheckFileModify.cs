@@ -19,6 +19,7 @@ namespace NS_Test
         public class AssemblyDefinitionContent
         {
             public string name;
+            public bool allowUnsafeCode;
         }
         
         private static FileSystemWatcher s_Watcher;
@@ -44,7 +45,8 @@ namespace NS_Test
                 return;
             }
 
-            var file2Dll = new Dictionary<string, string>();
+            var dll2Files = GenPatchAssemblies.hookDll2Doc;
+            dll2Files.Clear();
 
             var prefix = Application.dataPath.Replace(@"\", "/");
             
@@ -55,20 +57,34 @@ namespace NS_Test
                 {
                     var key = "Assets" + fullPath.Replace(@"\", "/").Replace(prefix, "");
                     var content = JsonUtility.FromJson<AssemblyDefinitionContent>(File.ReadAllText(asmdef));
+                    if (content.allowUnsafeCode == false)
+                    {
+                        LogWarning($"{Path.GetFileName(asmdef)} should set allowUnsafeCode true");
+                        continue;
+                    }
                     var value = content.name + ".dll";
-                    file2Dll[key] = value;
+                    if (dll2Files.ContainsKey(value)==false)
+                    {
+                        dll2Files[value] = new HashSet<string>();
+                    }
+                    dll2Files[value].Add(key);
                 }
             }
-            s_CacheFilePath.Clear();
 
-            HotReloadConfig.hotReloadAssemblies = file2Dll.Values.ToList();
+            if (dll2Files.Count == 0)
+            {
+                LogWarning("no dll need hot reload");
+                return;
+            }
+            
+            HotReloadConfig.hotReloadAssemblies = dll2Files.Keys.ToList();
 
             var sb = new StringBuilder();
             foreach (var ss in HotReloadConfig.hotReloadAssemblies) sb.Append(ss);
 
-            LogWarning(sb.ToString());
+            Log("hot reload dll: " + sb.ToString());
 
-            GenPatchAssemblies.DoGenPatchAssemblies(false, file2Dll);
+            GenPatchAssemblies.DoGenPatchAssemblies(false, dll2Files);
         }
 
         private static string TraverseAsmDef(string fullPath)
@@ -89,7 +105,8 @@ namespace NS_Test
         {
             if (s_Watcher == null)
             {
-                s_Watcher = new FileSystemWatcher(Application.dataPath + "/Scripts", "*.cs");
+                var watchPath = Path.Combine(Application.dataPath, "../");
+                s_Watcher = new FileSystemWatcher(Path.GetFullPath(watchPath), "*.cs");
                 s_Watcher.NotifyFilter = NotifyFilters.LastWrite;
                 s_Watcher.Changed += OnModified;
                 s_Watcher.Created += OnModified;
