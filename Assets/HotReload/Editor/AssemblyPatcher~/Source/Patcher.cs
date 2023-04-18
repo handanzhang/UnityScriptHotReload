@@ -91,7 +91,6 @@ public class Patcher
                         Debug.LogError($"[Error][{assName}]不符合热重载条件，停止重载");
                         return false;
                     }
-
                     string patchDll = string.Format(_inputArgs.patchDllPathFmt, assNameNoExt, _inputArgs.patchNo);
                     newAssDef.Write(patchDll, writeParam);
 
@@ -113,7 +112,6 @@ public class Patcher
         }
 
         GenOutputJsonFile();
-
         return true;
     }
 

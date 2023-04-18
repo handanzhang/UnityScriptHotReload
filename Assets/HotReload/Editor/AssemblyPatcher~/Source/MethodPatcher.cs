@@ -15,9 +15,6 @@ namespace AssemblyPatcher
  
 public class MethodPatcher
 {
-
-     static Dictionary<string, int> typeRefCounter = new Dictionary<string, int>();
-
     public static TypeReference Switch(AssemblyData assemblyData ,TypeReference typeRef)
     {
         // 方案开始不支持lambda的修改
@@ -25,10 +22,6 @@ public class MethodPatcher
         {
             return typeRef;
         }
-
-
-        var sw = new Stopwatch();
-        sw.Restart();
 
         // 如果能在new中找到对应的def，那就new一个新的type，完全替换，找不到就只替换泛型参数
         if(typeRef is GenericInstanceType gType)

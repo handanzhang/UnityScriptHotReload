@@ -245,31 +245,18 @@ public class AssemblyDataBuilder
             }
         }
 
-        var stopWatch = new Stopwatch();
-        stopWatch.Restart();
         FillAllBaseMethods();
-        stopWatch.Stop();
-        Debug.LogWarning($"fill base method cost: {stopWatch.ElapsedMilliseconds}");
 
-        stopWatch.Restart();
         // skip类型检查。通过和使用者约定，不增加field来达成，节省40ms
         if (!CheckTypesLayout())
             return false;
-        stopWatch.Stop();
-        Debug.LogWarning($"check type layout cost: {stopWatch.ElapsedMilliseconds}");
         
-        stopWatch.Restart();
         // 不再搜集doc的所有方法，断点的时候，作用域跳转到了新的dll内，静态字段，实例字段数据都不正确，因为断点意义也不大了。
         FindAndCheckModifiedMethods_New();
         //if (!FindAndCheckModifiedMethods())
         //    return false;
-        stopWatch.Stop();
-        Debug.LogWarning($"find modified method cost: {stopWatch.ElapsedMilliseconds}");
 
-        stopWatch.Restart();
         FillMethodInfoField();
-        stopWatch.Stop();
-        Debug.LogWarning($"fill method info cost: {stopWatch.ElapsedMilliseconds}");
 
         // modify instance metod to static method
         foreach(var method in assemblyData.allNewMethods.Values)
