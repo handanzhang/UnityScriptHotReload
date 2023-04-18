@@ -124,6 +124,7 @@ public class Patcher
         args.patchNo = root["patchNo"];
         args.workDir = root["workDir"];
         args.assembliesToPatch = root["assembliesToPatch"];
+        args.hookDocs = root["hookDocs"];
         args.patchAssemblyNameFmt = root["patchAssemblyNameFmt"];
         args.tempScriptDir = root["tempScriptDir"];
         args.tempCompileToDir = root["tempCompileToDir"];

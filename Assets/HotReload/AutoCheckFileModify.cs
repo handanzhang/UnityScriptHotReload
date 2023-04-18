@@ -1,4 +1,5 @@
 #define ENABLE_OPEN_HOT_RELOAD
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -128,8 +129,42 @@ namespace NS_Test
 
         private static void OnModified(object sender, FileSystemEventArgs e)
         {
-            Log($"modify state: {e.ChangeType}, {e.FullPath}");
-            s_CacheFilePath.Add(e.FullPath);
+            if (CheckValidFile(e.FullPath))
+            {
+                Log($"modify c# file. {e.FullPath}");
+
+                s_CacheFilePath.Add(e.FullPath);
+            }
+            else
+            {
+                // Log($"skip modified c# file. {e.FullPath}");
+            }
+        }
+
+        private static bool CheckValidFile(string fullName)
+        {
+            var fileName = Path.GetFileName(fullName);
+            if (fileName.StartsWith(".") || fileName.EndsWith("~"))
+            {
+                return false;
+            }
+
+            var dInfo = Directory.GetParent(fullName);
+            while (dInfo != null)
+            {
+                if (dInfo.Name == "client")
+                {
+                    return true;
+                }
+                
+                if(dInfo.Name.StartsWith(".") || dInfo.Name.EndsWith("~"))
+                {
+                    return false;
+                }
+                dInfo = dInfo.Parent;
+            }
+
+            return true;
         }
 
         private static void OnChanged(object sender, FileSystemEventArgs e)

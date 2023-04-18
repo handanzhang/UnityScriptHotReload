@@ -179,9 +179,13 @@ namespace ScriptHotReload
             inputArgs.workDir = Environment.CurrentDirectory;
 
             var docList = new List<string>();
+            var prefix = Directory.GetParent(Application.dataPath);
             foreach (var dll in hotReloadAssemblies)
             {
-                docList.AddRange(hookDll2Doc[dll]);
+                docList.AddRange(hookDll2Doc[dll].Select(filePath =>
+                                                         {
+                                                             return Path.Combine(prefix.FullName, filePath).Replace("\\", "/");
+                                                         }));
             }
             docList.Add("[segmentation]");
             

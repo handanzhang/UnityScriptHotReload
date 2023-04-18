@@ -7,6 +7,7 @@ using System.Linq;
 using static AssemblyPatcher.Utils;
 using OpCodes = Mono.Cecil.Cil.OpCodes;
 using System.Runtime.CompilerServices;
+using System.Diagnostics;
 
 namespace AssemblyPatcher
 {
@@ -14,6 +15,9 @@ namespace AssemblyPatcher
  
 public class MethodPatcher
 {
+
+     static Dictionary<string, int> typeRefCounter = new Dictionary<string, int>();
+
     public static TypeReference Switch(AssemblyData assemblyData ,TypeReference typeRef)
     {
         // 方案开始不支持lambda的修改
@@ -21,6 +25,10 @@ public class MethodPatcher
         {
             return typeRef;
         }
+
+
+        var sw = new Stopwatch();
+        sw.Restart();
 
         // 如果能在new中找到对应的def，那就new一个新的type，完全替换，找不到就只替换泛型参数
         if(typeRef is GenericInstanceType gType)
@@ -30,7 +38,7 @@ public class MethodPatcher
 
             if (gType.Resolve() != null && assemblyData.baseTypes.TryGetValue(typeRef.Resolve().FullName, out var baseDef))
             {
-                var oldRef = assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
+                var oldRef = assemblyData.ImportOldTypeRef(baseDef.definition);
                 returnType = new GenericInstanceType(oldRef);
             }
             returnType.GenericArguments.Clear();
@@ -45,7 +53,7 @@ public class MethodPatcher
             var def = typeRef.Resolve();
             if (def != null && assemblyData.baseTypes.TryGetValue(def.ToString(), out var baseDef))
             {
-                var oldRef = assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
+                var oldRef = assemblyData.ImportOldTypeRef(baseDef.definition);
                 return oldRef ?? typeRef;
             }
             else
@@ -67,7 +75,7 @@ public class MethodPatcher
         {
             if (baseTypeData.fields.TryGetValue(fieldDef.FullName, out FieldDefinition baseFieldDef))
             {
-                var fieldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseFieldDef);
+                var fieldRef = _assemblyData.ImportOldFieldRef(baseFieldDef);
                 var newIns = Instruction.Create(ins.OpCode, fieldRef);
                 ilProcessor.Replace(ins, newIns);
                 fixStatus.ilFixed = true;
@@ -184,7 +192,7 @@ public class MethodPatcher
                 {
                     if (_assemblyData.baseTypes.TryGetValue(typeDef.ToString(), out var baseDef))
                     {
-                        var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseDef.definition);
+                        var oldRef = _assemblyData.ImportOldTypeRef(baseDef.definition);
                         ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, oldRef));
                         fixStatus.ilFixed = true;
                     }
@@ -207,7 +215,7 @@ public class MethodPatcher
                     {
                         if (baseData.fields.TryGetValue(fDef.FullName, out FieldDefinition baseField))
                         {
-                            var fieldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseField);
+                            var fieldRef = _assemblyData.ImportOldFieldRef(baseField);
                             ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, fieldRef));
                             fixStatus.ilFixed = true;
                         }
@@ -223,7 +231,7 @@ public class MethodPatcher
                     // 新增字段，不处理
                     if (baseDef.fields.TryGetValue(def.ToString(), out FieldDefinition baseField))
                     {
-                        var oldRef = _assemblyData.newAssDef.MainModule.ImportReference(baseField);
+                        var oldRef = _assemblyData.ImportOldFieldRef(baseField);
                         oldRef.DeclaringType = Switch(_assemblyData, fRef.DeclaringType);
                         ilProcessor.Replace(ins, Instruction.Create(ins.OpCode, oldRef));
                     }
@@ -246,7 +254,7 @@ public class MethodPatcher
                 }
                 if ( _assemblyData.allBaseMethods.TryGetValue(mDef.ToString(), out MethodData baseMethodDef))
                 {
-                    var reference = _assemblyData.newAssDef.MainModule.ImportReference(baseMethodDef.definition);
+                    var reference = _assemblyData.ImportOldMethodRef(baseMethodDef.definition);
                     var newIns = Instruction.Create(ins.OpCode, reference);
                     ilProcessor.Replace(ins, newIns);
                     fixStatus.ilFixed = true;

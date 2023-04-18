@@ -34,6 +34,53 @@ public class AssemblyData
     public Dictionary<string, HookedMethodInfo>   methodsNeedHook  = new Dictionary<string, HookedMethodInfo>();
     public Dictionary<Document, List<MethodData>> doc2methodsOfNew = new Dictionary<Document, List<MethodData>>(); // newTypes 中 doc 与 method的映射
     public Dictionary<string, MethodData> allNewMethods = new Dictionary<string, MethodData>();
+    
+    private Dictionary<string, TypeReference> typeCacheRef = new Dictionary<string, TypeReference>();
+    private Dictionary<string, FieldReference> fieldCacheRef = new Dictionary<string, FieldReference>();
+    private Dictionary<string, MethodReference> methodCacheRef = new Dictionary<string, MethodReference>();
+
+    public TypeReference ImportOldTypeRef(TypeDefinition typeDef)
+    {
+        if(typeCacheRef.TryGetValue(typeDef.ToString(), out var ret))
+        {
+            return ret;
+        }
+        else
+        {
+            ret = newAssDef.MainModule.ImportReference(typeDef);
+            typeCacheRef[typeDef.ToString()] = ret;
+            return ret;
+        }
+    }
+
+    public FieldReference ImportOldFieldRef(FieldDefinition fieldDef)
+    {
+        if(fieldCacheRef.TryGetValue(fieldDef.ToString(), out var ret))
+        {
+            return ret;
+        }
+        else
+        {
+            ret = newAssDef.MainModule.ImportReference(fieldDef);
+            fieldCacheRef[fieldDef.ToString()] = ret;
+            return ret;
+        }
+    }
+
+    public MethodReference ImportOldMethodRef(MethodDefinition methodDef)
+    {
+        if(methodCacheRef.TryGetValue(methodDef.ToString(), out var ret))
+        {
+            return ret;
+        }
+        else
+        {
+            ret = newAssDef.MainModule.ImportReference(methodDef);
+            methodCacheRef[methodDef.ToString()] = ret;
+            return ret;
+        }
+    }
+
 }
 
 public class TypeData
@@ -199,31 +246,27 @@ public class AssemblyDataBuilder
         }
 
         var stopWatch = new Stopwatch();
-        stopWatch.Start();
+        stopWatch.Restart();
         FillAllBaseMethods();
         stopWatch.Stop();
         Debug.LogWarning($"fill base method cost: {stopWatch.ElapsedMilliseconds}");
 
+        stopWatch.Restart();
+        // skip类型检查。通过和使用者约定，不增加field来达成，节省40ms
         if (!CheckTypesLayout())
             return false;
+        stopWatch.Stop();
+        Debug.LogWarning($"check type layout cost: {stopWatch.ElapsedMilliseconds}");
         
-        stopWatch.Start();
-        if (!FindAndCheckModifiedMethods())
-            return false;
+        stopWatch.Restart();
+        // 不再搜集doc的所有方法，断点的时候，作用域跳转到了新的dll内，静态字段，实例字段数据都不正确，因为断点意义也不大了。
+        FindAndCheckModifiedMethods_New();
+        //if (!FindAndCheckModifiedMethods())
+        //    return false;
         stopWatch.Stop();
         Debug.LogWarning($"find modified method cost: {stopWatch.ElapsedMilliseconds}");
 
-
-        stopWatch.Start();
-        if (!FindNewAddMethods())
-        {
-            return false;
-        }
-        stopWatch.Stop();
-        Debug.LogWarning($"find new method cost: {stopWatch.ElapsedMilliseconds}");
-
-
-        stopWatch.Start();
+        stopWatch.Restart();
         FillMethodInfoField();
         stopWatch.Stop();
         Debug.LogWarning($"fill method info cost: {stopWatch.ElapsedMilliseconds}");
@@ -366,6 +409,85 @@ public class AssemblyDataBuilder
         return true;
     }
 
+    public bool FindAndCheckModifiedMethods_New()
+    {
+        Dictionary<string, Document> _string2Doc = new Dictionary<string, Document>();
+
+        foreach(var doc in assemblyData.doc2methodsOfNew.Keys)
+        {
+            _string2Doc[doc.Url.Replace("\\", "/")] = doc;
+        }
+
+        var docs = InputArgs.Instance.hookDocs;
+        foreach(var filePath in docs)
+        {
+            // 这里和assembliesToPatch对应， 用于区分不同的dll
+            if(filePath == "[segmentation]")
+            {
+                continue;
+            }
+
+            if(_string2Doc.TryGetValue(filePath, out var document))
+            {
+                var methods = assemblyData.doc2methodsOfNew[document];
+
+                foreach(var newMethod in methods)
+                {
+                    var methodName = newMethod.definition.ToString();
+
+                    if (IsLambdaMethod(newMethod.definition))
+                    {
+                        continue;
+                    }
+
+                    if(assemblyData.allBaseMethods.TryGetValue(methodName, out var baseMethod))
+                    {
+                        var baseIns = baseMethod.definition.Body.Instructions;
+                        var newIns = newMethod.definition.Body.Instructions;
+                        bool ilChanged = false;
+
+                        if (baseIns.Count != newIns.Count)
+                            ilChanged = true;
+                        else
+                        {
+                            /*
+                             * TODO 通过 method RVA/codeSize 对比，method header 只有两种size，1 or 12
+                             * 2022-12-23: 经测试不能直接对比 method body 的二进制，原因是类的成员变量RID每次编译会不一致，导致 ldfld 之类的指令引用的编号发生变化
+                             */
+                            var arrBaseIns = baseIns.ToArray();
+                            var arrNewIns = newIns.ToArray();
+                            for (int l = 0, lmax = arrBaseIns.Length; l < lmax; l++)
+                            {
+                                if (arrBaseIns[l].ToString() != arrNewIns[l].ToString())
+                                {
+                                    ilChanged = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (ilChanged)
+                        {
+                            baseMethod.ilChanged = true;
+                            newMethod.ilChanged = true;
+                            assemblyData.methodsNeedHook.Add(methodName, new HookedMethodInfo(baseMethod, newMethod, true));
+                        }
+
+                    }
+                    else
+                    {
+                        newMethod.ilChanged = true;
+                        assemblyData.methodsNeedHook.Add(methodName, new HookedMethodInfo(null, newMethod, true));
+                        assemblyData.allNewMethods.Add(methodName, newMethod);
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+
 
     //TODO 直接用doc来判断，不在逐一遍历了
     public bool FindAndCheckModifiedMethods()
@@ -443,6 +565,8 @@ public class AssemblyDataBuilder
                 }
             }
         }
+
+
         return true;
         // il发生改变的函数所在文件的其它所有原dll中存在的函数均添加到 modified 列表，以全部使用新的pdb(它们的行号可能发生了改变，不执行hook会导致断点失效)
         // 不 hook了，速度太慢了.
@@ -551,9 +675,6 @@ public class AssemblyDataBuilder
     void FixNewAssembly()
     {
 
-        var stopWatch = new Stopwatch();
-        stopWatch.Start();
-
         // .net 不允许加载同名Assembly，因此需要改名
         _newAssDef.Name.Name = string.Format(InputArgs.Instance.patchAssemblyNameFmt, _baseAssDef.Name.Name, _patchNo);
         {
@@ -567,9 +688,6 @@ public class AssemblyDataBuilder
         
         _newAssDef.MainModule.ModuleReferences.Add(_baseAssDef.MainModule);
 
-
-        //foreach(var n in Patcher.asmList)
-
         {// 给Assembly添加Attribute以允许IL访问外部类的私有字段
             // IgnoresAccessChecksTo(AssemblyName)
             {
@@ -581,12 +699,6 @@ public class AssemblyDataBuilder
 
             }
         }
-
-        stopWatch.Stop();
-        Debug.LogWarning($"add attributes cost: {stopWatch.ElapsedMilliseconds}");
-
-
-        stopWatch.Start();
 
         Dictionary<string, MethodData> methodsToFix =
             new Dictionary<string, MethodData> (from data in assemblyData.methodsNeedHook select KeyValuePair.Create(data.Key, data.Value.newMethod));
@@ -626,13 +738,10 @@ public class AssemblyDataBuilder
             }
         }
 
-        stopWatch.Stop();
-        Debug.LogWarning($"find method hook cost: {stopWatch.ElapsedMilliseconds}");
-
-
-        stopWatch.Start();
         var processed = new Dictionary<MethodDefinition, MethodFixStatus>();
 
+        var stopWatch = new Stopwatch();
+        stopWatch.Start();
         foreach (var kv in methodsToFix)
         {
             _methodPatcher.PatchMethod(kv.Value.definition, processed, 0);
