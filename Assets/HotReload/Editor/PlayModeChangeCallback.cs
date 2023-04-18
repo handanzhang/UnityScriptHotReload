@@ -3,6 +3,7 @@
  * email: easy66@live.com
  * github: https://github.com/Misaka-Mikoto-Tech/UnityScriptHotReload
  */
+#if ENABLE_OPEN_HOT_RELOAD && UNITY_EDITOR
 
 using System.IO;
 using UnityEditor;
@@ -11,6 +12,8 @@ using static ScriptHotReload.HotReloadConfig;
 
 namespace ScriptHotReload
 {
+    
+    
     [InitializeOnLoad]
     public static class PlayModeChangeCallback
     {
@@ -61,3 +64,5 @@ namespace ScriptHotReload
         }
     }
 }
+
+#endif

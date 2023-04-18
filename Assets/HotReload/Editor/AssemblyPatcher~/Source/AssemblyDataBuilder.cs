@@ -207,11 +207,17 @@ public class AssemblyDataBuilder
         var baseTypes = _baseAssDef.MainModule.Types;
         var newTypes = _newAssDef.MainModule.Types; // 不包括 NestedClass
 
+        var sw = new Stopwatch();
+        sw.Restart();
+
         foreach (var t in baseTypes)
             GenTypeInfos(t, null, assemblyData.baseTypes);
 
         foreach (var t in newTypes)
             GenTypeInfos(t, null, assemblyData.newTypes);
+
+        sw.Stop();
+        Debug.LogWarning($"method types {sw.ElapsedMilliseconds}");
 
         // 全局处理类型和方法
         foreach(var kvT in assemblyData.newTypes)

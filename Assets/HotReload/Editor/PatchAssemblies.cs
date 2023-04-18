@@ -22,11 +22,18 @@ using Debug = UnityEngine.Debug;
 
 namespace ScriptHotReload
 {
+
+    public class HookMethodInfo
+    {
+        public MethodBase methodBase;
+        public string document;
+    }
+    
     public class GenPatchAssemblies
     {
         public static bool codeHasChanged => methodsToHook.Count > 0;
 
-        public static Dictionary<string, List<MethodBase>> methodsToHook { get; } = new Dictionary<string, List<MethodBase>>();
+        public static Dictionary<string, List<HookMethodInfo>> methodsToHook { get; } = new Dictionary<string, List<HookMethodInfo>>();
 
         public static int patchNo { get; private set; }
 
@@ -87,25 +94,6 @@ namespace ScriptHotReload
                 patchNo++;
 
             Debug.Log($"<color=yellow>热重载完成 patch no: {patchNo}</color>");
-        }
-
-        [MenuItem("ScriptHotReload/ForceHook")]
-        public static void ForceHook()
-        {
-            methodsToHook.Clear();
-            ParseOutputReport();
-            if (methodsToHook.Count == 0)
-            {
-                Debug.Log("代码没有发生改变，不执行热重载");
-                return;
-            }
-
-            HookAssemblies.DoHook(methodsToHook);
-            if (methodsToHook.Count > 0)
-                patchNo++;
-
-            Debug.Log("<color=yellow>热重载完成</color>");
-            
         }
 
         private static int RunAssemblyPatchProcess()
@@ -214,7 +202,7 @@ namespace ScriptHotReload
             var text = File.ReadAllText(kAssemblyPatcherOutput);
             var outputReport = JsonUtility.FromJson<OutputReport>(text);
 
-            foreach (var assName in outputReport.assemblyChangedFromLast) methodsToHook.Add(assName, new List<MethodBase>());
+            foreach (var assName in outputReport.assemblyChangedFromLast) methodsToHook.Add(assName, new List<HookMethodInfo>());
 
             foreach (var data in outputReport.methodsNeedHook)
             {
@@ -245,7 +233,11 @@ namespace ScriptHotReload
                 if (!methodsToHook.TryGetValue(data.assembly, out var list))
                     throw new Exception($"unexpected assembly name `{data.assembly}`");
 
-                list.Add(method);
+                list.Add(new HookMethodInfo()
+                {
+                    methodBase = method,
+                    document   = data.document
+                });
             }
         }
 

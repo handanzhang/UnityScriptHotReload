@@ -1,5 +1,3 @@
-#define ENABLE_OPEN_HOT_RELOAD
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,10 +8,8 @@ using UnityEditor;
 using UnityEngine;
 using static ScriptHotReload.HookAssemblies;
 
-namespace NS_Test
+namespace ScriptHotReload
 {
-#if ENABLE_OPEN_HOT_RELOAD
-
     public class AutoCheckFileModify
     {
         [Serializable]
@@ -22,13 +18,13 @@ namespace NS_Test
             public string name;
             public bool allowUnsafeCode;
         }
+
+        public static HashSet<string> s_CacheFilePath;
         
         private static FileSystemWatcher s_Watcher;
 
-        private static HashSet<string> s_CacheFilePath;
-
-
-#if UNITY_EDITOR
+#if ENABLE_OPEN_HOT_RELOAD && UNITY_EDITOR
+        
         [MenuItem("ScriptHotReload/AutoPatchAssembly")]
         public static void AutoPatch()
         {
@@ -42,7 +38,7 @@ namespace NS_Test
 
             if (s_CacheFilePath.Count == 0)
             {
-                LogWarning("no file changed!!!");
+                LogWarning("no file need hot reload!!!");
                 return;
             }
 
@@ -51,7 +47,7 @@ namespace NS_Test
 
             var prefix = Application.dataPath.Replace(@"\", "/");
             
-            foreach (var fullPath in s_CacheFilePath)
+            foreach (var fullPath in s_CacheFilePath.ToList())
             {
                 var asmdef = TraverseAsmDef(fullPath);
                 if (!string.IsNullOrEmpty(asmdef))
@@ -74,10 +70,11 @@ namespace NS_Test
 
             if (dll2Files.Count == 0)
             {
+                s_CacheFilePath.Clear();
                 LogWarning("no dll need hot reload");
                 return;
             }
-            
+
             HotReloadConfig.hotReloadAssemblies = dll2Files.Keys.ToList();
 
             var sb = new StringBuilder();
@@ -135,10 +132,6 @@ namespace NS_Test
 
                 s_CacheFilePath.Add(e.FullPath);
             }
-            else
-            {
-                // Log($"skip modified c# file. {e.FullPath}");
-            }
         }
 
         private static bool CheckValidFile(string fullName)
@@ -167,33 +160,6 @@ namespace NS_Test
             return true;
         }
 
-        private static void OnChanged(object sender, FileSystemEventArgs e)
-        {
-            if (e.ChangeType != WatcherChangeTypes.Changed) return;
-
-            s_CacheFilePath.Add(e.FullPath);
-            Log("changed: " + e.FullPath);
-        }
-
-        private static void OnCreated(object sender, FileSystemEventArgs e)
-        {
-            var value = $"Created: {e.FullPath}";
-            s_CacheFilePath.Add(e.FullPath);
-            Log(value);
-        }
-
-        private static void OnDeleted(object sender, FileSystemEventArgs e)
-        {
-            s_CacheFilePath.Add(e.FullPath);
-            Log($"Deleted: {e.FullPath}");
-        }
-
-        private static void OnRenamed(object sender, RenamedEventArgs e)
-        {
-            s_CacheFilePath.Add(e.FullPath);
-            Log($"Renamed: Old: {e.OldFullPath}, New: {e.FullPath}");
-        }
-
         private static void OnError(object sender, ErrorEventArgs e)
         {
             PrintException(e.GetException());
@@ -210,8 +176,6 @@ namespace NS_Test
                 PrintException(ex.InnerException);
             }
         }
-
 #endif
     }
-#endif
 }

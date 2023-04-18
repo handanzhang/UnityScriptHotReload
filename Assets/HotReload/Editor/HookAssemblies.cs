@@ -30,8 +30,22 @@ namespace ScriptHotReload
             Debug.Log($"[hot reload] <color=yellow>{s}</color>");
         }
 
-        public static void DoHook(Dictionary<string, List<MethodBase>> methodsToHook)
+        public static void DoHook(Dictionary<string, List<HookMethodInfo>> methodsToHook)
         {
+            var prefix = Application.dataPath.Replace(@"\", "/");
+
+            var hookSucceed = new Dictionary<string, int>();
+            var unityPath2FullPath = new Dictionary<string, string>();
+
+            const int DEFAULT_VALUE = -1;
+
+            foreach (var fullPath in AutoCheckFileModify.s_CacheFilePath)
+            {
+                var key = "Assets" + fullPath.Replace(@"\", "/").Replace(prefix, "");
+                hookSucceed[key] = DEFAULT_VALUE;
+                unityPath2FullPath[key] = fullPath;
+            }
+            
             foreach (var kv in methodsToHook)
             {
                 var assName = kv.Key;
@@ -41,9 +55,9 @@ namespace ScriptHotReload
                 var patchAssPath = string.Format(kPatchDllPathFormat, Path.GetFileNameWithoutExtension(assName), GenPatchAssemblies.patchNo);
                 var patchAssembly = Assembly.LoadFrom(patchAssPath);
                 
-                foreach (var method in kv.Value)
+                foreach (var hookMethod in kv.Value)
                 {
-                    var miTarget = method;
+                    var miTarget = hookMethod.methodBase;
                     if (miTarget.ContainsGenericParameters) // 泛型暂时不处理
                         continue;
 
@@ -58,12 +72,31 @@ namespace ScriptHotReload
                     try
                     {
                         new MethodHook(miTarget, miReplace, null, hookTag).Install();
+                        if (hookSucceed.TryGetValue(hookMethod.document, out var result))
+                        {
+                            if (result == DEFAULT_VALUE)
+                            {
+                                hookSucceed[hookMethod.document] = 0;
+                            }
+                        }
                     }
                     catch (Exception exception)
                     {
+                        hookSucceed[hookMethod.document] = 1;
                         Debug.LogError(exception);
                     }
                 }
+            }
+
+            foreach (var pair in hookSucceed)
+            {
+                if (pair.Value != 0)
+                {
+                    continue;
+                }
+
+                Debug.Log("hot reload succeed file: " + unityPath2FullPath[pair.Key]);
+                AutoCheckFileModify.s_CacheFilePath.Remove(unityPath2FullPath[pair.Key]);
             }
         }
     }

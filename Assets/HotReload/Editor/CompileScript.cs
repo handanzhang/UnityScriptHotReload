@@ -93,6 +93,8 @@ namespace ScriptHotReload
         [UnityEditor.Callbacks.DidReloadScripts]
         private static void Init()
         {
+#if ENABLE_OPEN_HOT_RELOAD
+            
             {
                 // install hook
                 var miOri = EditorCompilationWrapper.miTickCompilationPipeline;
@@ -100,6 +102,7 @@ namespace ScriptHotReload
                 var miReplace = typeof(CompileScript).GetMethod(nameof(TickCompilationPipeline_Proxy), BindingFlags.NonPublic | BindingFlags.Static);
                 new MethodHook(miOri, miNew, miReplace).Install();
             }
+#endif
         }
 
         private static void EditorApplication_Update()
