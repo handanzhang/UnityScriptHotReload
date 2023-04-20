@@ -1,17 +1,24 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
-using ScriptHotReload;
 using UnityEditor;
+using UnityEditor.Compilation;
 using UnityEngine;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using static ScriptHotReload.HookAssemblies;
+using Debug = UnityEngine.Debug;
 
 namespace ScriptHotReload
 {
     public class AutoCheckFileModify
     {
+        
         [Serializable]
         public class AssemblyDefinitionContent
         {
@@ -23,7 +30,7 @@ namespace ScriptHotReload
         
         private static FileSystemWatcher s_Watcher;
 
-#if ENABLE_OPEN_HOT_RELOAD && UNITY_EDITOR
+#if ENABLE_JN_HOT_RELOAD && UNITY_EDITOR
         
         [MenuItem("ScriptHotReload/AutoPatchAssembly")]
         public static void AutoPatch()
@@ -54,11 +61,6 @@ namespace ScriptHotReload
                 {
                     var key = "Assets" + fullPath.Replace(@"\", "/").Replace(prefix, "");
                     var content = JsonUtility.FromJson<AssemblyDefinitionContent>(File.ReadAllText(asmdef));
-                    if (content.allowUnsafeCode == false)
-                    {
-                        LogWarning($"{Path.GetFileName(asmdef)} should set allowUnsafeCode true");
-                        continue;
-                    }
                     var value = content.name + ".dll";
                     if (dll2Files.ContainsKey(value)==false)
                     {
@@ -97,6 +99,7 @@ namespace ScriptHotReload
                 return result.First().FullName;
             return TraverseAsmDef(dInfo.FullName);
         }
+        
 
         [InitializeOnLoadMethod]
         public static void CheckModifyListener()
@@ -110,15 +113,12 @@ namespace ScriptHotReload
                 s_Watcher.Created += OnModified;
                 s_Watcher.Deleted += OnModified;
                 s_Watcher.Renamed += OnModified;
-                // s_Watcher.Changed += OnChanged;
-                // s_Watcher.Created += OnCreated;
-                // s_Watcher.Deleted += OnDeleted;
-                // s_Watcher.Renamed += OnRenamed;
                 s_Watcher.Error += OnError;
                 s_Watcher.IncludeSubdirectories = true;
                 s_Watcher.EnableRaisingEvents = true;
 
                 Log("<color=yellow>start watching file changed</color>");
+
             }
 
             s_CacheFilePath = new HashSet<string>();

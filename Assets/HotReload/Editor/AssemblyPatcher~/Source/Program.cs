@@ -48,7 +48,6 @@ internal class Program
         if (!success)
             return -1;
 
-        Debug.Log("Patch成功");
         return 0;
     }
 }

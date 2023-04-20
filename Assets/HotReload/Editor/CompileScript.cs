@@ -4,6 +4,7 @@
  * github: https://github.com/Misaka-Mikoto-Tech/UnityScriptHotReload
  */
 
+
 using System;
 using System.IO;
 using System.Reflection;
@@ -93,8 +94,7 @@ namespace ScriptHotReload
         [UnityEditor.Callbacks.DidReloadScripts]
         private static void Init()
         {
-#if ENABLE_OPEN_HOT_RELOAD
-            
+#if ENABLE_JN_HOT_RELOAD
             {
                 // install hook
                 var miOri = EditorCompilationWrapper.miTickCompilationPipeline;

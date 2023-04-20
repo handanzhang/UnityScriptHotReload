@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
+using UnityEngine;
 
 namespace ScriptHotReload
 {
@@ -124,22 +125,13 @@ namespace ScriptHotReload
 
         public static CompileStatus CompileScriptsWithSettings(object scriptAssemblySettings)
         {
-#if UNITY_2020_1_OR_NEWER
             var param = CompileScript.editorBuildParams;
 
             miSetCompileScriptsOutputDirectory.Invoke(EditorCompilation_Instance, new object[] {param.outputDir});
-
             var ret = (CompileStatus) miCompileScripts.Invoke(EditorCompilation_Instance, new object[]
             {
                 (int) param.options, param.platformGroup, param.platform, param.extraScriptingDefines, /*StopOnFirstError*/1
             });
-#else
-            var param = CompileScript.editorBuildParams;
-            CompileStatus ret = (CompileStatus)miCompileScripts.Invoke(EditorCompilation_Instance, new object[] 
-            {
-                scriptAssemblySettings, param.outputDir, (int)param.options, /*StopOnFirstError*/1, null, null
-            });
-#endif
             return ret;
         }
 

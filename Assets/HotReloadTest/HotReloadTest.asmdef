@@ -1,18 +1,21 @@
 {
-    "name": "HotReload",
+    "name": "HotReloadTest",
     "rootNamespace": "",
     "references": [
-        "TestDllA",
-        "TestDllB"
+        "",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
-    "allowUnsafeCode": true,
+    "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
         "Microsoft.CodeAnalysis.CSharp.dll",
-        "System.Collections.Immutable.dll",
-        "Microsoft.CodeAnalysis.dll"
+        "Microsoft.CodeAnalysis.dll",
+        "System.Collections.Immutable.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [],

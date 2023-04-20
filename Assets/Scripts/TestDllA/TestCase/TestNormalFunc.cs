@@ -1,4 +1,3 @@
-#define ENABLE_OPEN_HOT_RELOAD
 
 using System;
 using System.Collections.Generic;
@@ -48,7 +47,7 @@ namespace NS_Test.TestCase
         
         public static void Test2()
         {
-#if ENABLE_OPEN_HOT_RELOAD
+#if HOT_RELOAD_UNIT_TEST
 
 #else
             if (s_lambda != null)
@@ -58,7 +57,7 @@ namespace NS_Test.TestCase
 #endif
         }
 
-#if ENABLE_OPEN_HOT_RELOAD
+#if HOT_RELOAD_UNIT_TEST
 
         public void XXX()
         {

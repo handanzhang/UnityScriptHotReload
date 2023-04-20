@@ -295,8 +295,6 @@ public class AssemblyDataBuilder
             method.ilChanged = true;
         }
 
-        Debug.LogWarning("-------------------------------");
-
         FixNewAssembly();
 
         isValid = true;

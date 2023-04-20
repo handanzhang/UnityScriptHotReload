@@ -3,7 +3,7 @@
  * email: easy66@live.com
  * github: https://github.com/Misaka-Mikoto-Tech/UnityScriptHotReload
  */
-#if ENABLE_OPEN_HOT_RELOAD && UNITY_EDITOR
+#if ENABLE_JN_HOT_RELOAD && UNITY_EDITOR
 
 using System.IO;
 using UnityEditor;
@@ -12,8 +12,6 @@ using static ScriptHotReload.HotReloadConfig;
 
 namespace ScriptHotReload
 {
-    
-    
     [InitializeOnLoad]
     public static class PlayModeChangeCallback
     {
@@ -31,7 +29,6 @@ namespace ScriptHotReload
                     HotReloadUtils.RemoveAllFiles(kTempScriptDir);
                     if (Directory.Exists(kTempCompileToDir))
                         Directory.Delete(kTempCompileToDir);
-
                     CompileScript.ResetCompileStatus();
                     string json = EditorPrefs.GetString(kEditorScriptBuildParamsKey);
                     if (!string.IsNullOrEmpty(json))
