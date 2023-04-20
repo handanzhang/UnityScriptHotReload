@@ -68,21 +68,22 @@ namespace ScriptHotReload
                         continue;
                     }
 
-                    Debug.Log($"hook method, {miTarget.Name}");
+                    Log($"hook method, {miTarget.Name}");
+                    var key = hookMethod.document.Replace(@"\", "/");
                     try
                     {
                         new MethodHook(miTarget, miReplace, null, hookTag).Install();
-                        if (hookSucceed.TryGetValue(hookMethod.document, out var result))
+                        if (hookSucceed.TryGetValue(key, out var result))
                         {
                             if (result == DEFAULT_VALUE)
                             {
-                                hookSucceed[hookMethod.document] = 0;
+                                hookSucceed[key] = 0;
                             }
                         }
                     }
                     catch (Exception exception)
                     {
-                        hookSucceed[hookMethod.document] = 1;
+                        hookSucceed[key] = 1;
                         Debug.LogError(exception);
                     }
                 }
@@ -95,7 +96,7 @@ namespace ScriptHotReload
                     continue;
                 }
 
-                Debug.Log("hot reload succeed file: " + unityPath2FullPath[pair.Key]);
+                Log("hot reload succeed file: " + unityPath2FullPath[pair.Key]);
                 AutoCheckFileModify.s_CacheFilePath.Remove(unityPath2FullPath[pair.Key]);
             }
         }

@@ -6,7 +6,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 using UnityEditor;
 using UnityEditor.Build.Player;
 using UnityEditor.Compilation;
@@ -17,8 +21,7 @@ namespace ScriptHotReload
 
     static class ReflectionEx
     {
-        const BindingFlags FLAGS = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
-                                   BindingFlags.NonPublic;
+        const BindingFlags FLAGS = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
         static object Inst(object self)
         {
@@ -67,14 +70,13 @@ namespace ScriptHotReload
             else
                 (mi as FieldInfo).SetValue(Inst(self), value);
         }
-
-
     }
 
     public static class CompileScriptJN
     {
-
         public static List<string> s_CompileMarco = new List<string>();
+
+        private static List<MetadataReference> s_AllRefs = new List<MetadataReference>();
         
         public static void CompileHotTest()
         {
@@ -106,7 +108,7 @@ namespace ScriptHotReload
             }
             
         }
-
+    
         static void OnAssemblyCompilationStarted(String name)
         {
             
@@ -159,6 +161,68 @@ namespace ScriptHotReload
                 s_CompileMarco = defines.Distinct().ToList();
             }
         }
+        
+        
+        public static void ManuCompilation()
+        {
 
+            if (s_AllRefs.Count == 0)
+            {
+                foreach (var ass in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (ass.IsDynamic)
+                        continue;
+
+                    if (!string.IsNullOrEmpty(ass.Location))
+                    {
+                        s_AllRefs.Add(MetadataReference.CreateFromFile(ass.Location));
+                    }
+                }
+            }
+          
+            var customMacro = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone).Split(',', ';');;
+
+            var builtinMacro = CompileScriptJN.s_CompileMarco;
+
+            var symbols = new HashSet<string>(builtinMacro);
+            symbols.UnionWith(customMacro);
+            
+            var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe:true).WithMetadataImportOptions(MetadataImportOptions.All);
+
+            ReflectionEx.Set(compilationOptions, "TopLevelBinderFlags" , (uint)1 << 22);
+
+            var csharpParseOptions = new CSharpParseOptions(LanguageVersion.Latest, preprocessorSymbols: symbols);
+
+            var files = new List<String>
+            {
+                @"Assets\HotReloadTest\HotTest.cs",
+                @"Assets\HotReloadTest\HotTest1.cs"
+            };
+
+            var dllName = "HotReloadTest.dll";
+            var pdbName = "HotReloadTest.pdb";
+
+            var syntaxTreeList = new List<SyntaxTree>();
+
+            foreach (var file in files)
+            {
+                var fullPath = Path.GetFullPath(file);
+                syntaxTreeList.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(file), csharpParseOptions, fullPath, Encoding.UTF8));
+            }
+          
+            var compilation = CSharpCompilation.Create("HotReloadTest", syntaxTreeList, s_AllRefs, compilationOptions);
+            
+            var emitOptions = new EmitOptions(
+                debugInformationFormat: DebugInformationFormat.PortablePdb,
+                pdbFilePath: pdbName);
+
+            var dllPath = Path.Combine(HotReloadConfig.kTempCompileToDir, dllName);
+            var pdbPath = Path.Combine(HotReloadConfig.kTempCompileToDir, pdbName);
+            using (var dll = new FileStream(dllPath, FileMode.Create))
+            using(var pdb = new FileStream(pdbPath, FileMode.Create))
+            {
+                compilation.Emit(dll, pdb, options:emitOptions);
+            }
+        }
     }
 }

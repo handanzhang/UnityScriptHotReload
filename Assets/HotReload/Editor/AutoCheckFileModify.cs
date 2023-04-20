@@ -1,24 +1,16 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using UnityEditor;
-using UnityEditor.Compilation;
 using UnityEngine;
-using System.Reflection;
-using System.Text.RegularExpressions;
 using static ScriptHotReload.HookAssemblies;
-using Debug = UnityEngine.Debug;
 
 namespace ScriptHotReload
 {
     public class AutoCheckFileModify
     {
-        
         [Serializable]
         public class AssemblyDefinitionContent
         {
@@ -27,11 +19,11 @@ namespace ScriptHotReload
         }
 
         public static HashSet<string> s_CacheFilePath;
-        
+
         private static FileSystemWatcher s_Watcher;
 
 #if ENABLE_JN_HOT_RELOAD && UNITY_EDITOR
-        
+
         [MenuItem("ScriptHotReload/AutoPatchAssembly")]
         public static void AutoPatch()
         {
@@ -53,7 +45,7 @@ namespace ScriptHotReload
             dll2Files.Clear();
 
             var prefix = Application.dataPath.Replace(@"\", "/");
-            
+
             foreach (var fullPath in s_CacheFilePath.ToList())
             {
                 var asmdef = TraverseAsmDef(fullPath);
@@ -62,10 +54,11 @@ namespace ScriptHotReload
                     var key = "Assets" + fullPath.Replace(@"\", "/").Replace(prefix, "");
                     var content = JsonUtility.FromJson<AssemblyDefinitionContent>(File.ReadAllText(asmdef));
                     var value = content.name + ".dll";
-                    if (dll2Files.ContainsKey(value)==false)
+                    if (dll2Files.ContainsKey(value) == false)
                     {
                         dll2Files[value] = new HashSet<string>();
                     }
+
                     dll2Files[value].Add(key);
                 }
             }
@@ -99,7 +92,7 @@ namespace ScriptHotReload
                 return result.First().FullName;
             return TraverseAsmDef(dInfo.FullName);
         }
-        
+
 
         [InitializeOnLoadMethod]
         public static void CheckModifyListener()
@@ -118,7 +111,6 @@ namespace ScriptHotReload
                 s_Watcher.EnableRaisingEvents = true;
 
                 Log("<color=yellow>start watching file changed</color>");
-
             }
 
             s_CacheFilePath = new HashSet<string>();
@@ -128,8 +120,6 @@ namespace ScriptHotReload
         {
             if (CheckValidFile(e.FullPath))
             {
-                Log($"modify c# file. {e.FullPath}");
-
                 s_CacheFilePath.Add(e.FullPath);
             }
         }
@@ -149,11 +139,12 @@ namespace ScriptHotReload
                 {
                     return true;
                 }
-                
-                if(dInfo.Name.StartsWith(".") || dInfo.Name.EndsWith("~"))
+
+                if (dInfo.Name.StartsWith(".") || dInfo.Name.EndsWith("~"))
                 {
                     return false;
                 }
+
                 dInfo = dInfo.Parent;
             }
 

@@ -122,13 +122,16 @@ namespace ScriptHotReload
                     }
                     
                     var prefix = Path.Combine(Application.dataPath, "../", HotReloadConfig.kTempCompileToDir);
+                    var key = name;
+                    var value = ass.Location;
                     if (HotReloadConfig.hotReloadAssemblies.Contains(name + ".dll"))
                     {
-                        ret.TryAdd(name, prefix + "/" + name);
+                        value =  prefix + "/" + name + ".dll";
                     }
-                    else
+                    
+                    if (!ret.ContainsKey(key))
                     {
-                        ret.TryAdd(name, ass.Location);
+                        ret.Add(key, value);
                     }
                 }
             }

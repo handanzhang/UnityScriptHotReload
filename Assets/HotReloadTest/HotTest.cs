@@ -20,7 +20,7 @@ namespace HOT_RELOAD_TEST
         [MenuItem("haitong/test")]
         public static void Test()
         {
-            Debug.Log($"Here122 {_ii}");
+            Debug.Log($"NS123 {_ii}");
         }
 
         public static void TestAsm()

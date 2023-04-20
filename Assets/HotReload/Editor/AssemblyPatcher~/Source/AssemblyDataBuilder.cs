@@ -207,17 +207,12 @@ public class AssemblyDataBuilder
         var baseTypes = _baseAssDef.MainModule.Types;
         var newTypes = _newAssDef.MainModule.Types; // 不包括 NestedClass
 
-        var sw = new Stopwatch();
-        sw.Restart();
 
         foreach (var t in baseTypes)
             GenTypeInfos(t, null, assemblyData.baseTypes);
 
         foreach (var t in newTypes)
             GenTypeInfos(t, null, assemblyData.newTypes);
-
-        sw.Stop();
-        Debug.LogWarning($"method types {sw.ElapsedMilliseconds}");
 
         // 全局处理类型和方法
         foreach(var kvT in assemblyData.newTypes)
@@ -731,17 +726,10 @@ public class AssemblyDataBuilder
 
         var processed = new Dictionary<MethodDefinition, MethodFixStatus>();
 
-        var stopWatch = new Stopwatch();
-        stopWatch.Start();
         foreach (var kv in methodsToFix)
         {
             _methodPatcher.PatchMethod(kv.Value.definition, processed, 0);
         }
-        stopWatch.Stop();
-
-        Debug.LogWarning($"fix method cost: {stopWatch.ElapsedMilliseconds}");
-
-
 
         // 已存在类的静态构造函数需要清空，防止被二次调用
         if (processed.Count > 0)

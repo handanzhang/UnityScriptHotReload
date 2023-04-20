@@ -78,72 +78,10 @@ namespace ScriptHotReload
 #else
             
             CompileScriptJN.CompileHotTest();
-            ManuCompilation();
+            CompileScriptJN.ManuCompilation();
             OnScriptCompileSuccess(CompileStatus.Idle);
 #endif
 
-        }
-
-        static void ManuCompilation()
-        {
-            var asm = AppDomain.CurrentDomain.GetAssemblies();
-            
-            var metadataReferences = new List<MetadataReference>();
-            foreach (var a in asm)
-            {
-                if (string.IsNullOrEmpty(a.Location))
-                {
-                    Debug.LogError($"{a.FullName}");
-                    continue;
-                }
-                metadataReferences.Add(MetadataReference.CreateFromFile(a.Location));
-            }
-            
-            var customMacro = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone).Split(',', ';');;
-
-            var builtinMacro = CompileScriptJN.s_CompileMarco;
-
-            var symbols = new HashSet<string>(builtinMacro);
-            symbols.UnionWith(customMacro);
-            
-            
-            var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe:true).WithMetadataImportOptions(MetadataImportOptions.All);
-            
-            var topLevelBinderFlagsProperty = typeof(CSharpCompilationOptions).GetProperty("TopLevelBinderFlags", BindingFlags.Instance | BindingFlags.NonPublic);
-            topLevelBinderFlagsProperty.SetValue(compilationOptions, (uint)1 << 22);
-
-            var csharpParseOptions = new CSharpParseOptions(LanguageVersion.Latest, preprocessorSymbols: symbols);
-
-            var files = new List<String>
-            {
-                @"Assets\HotReloadTest\HotTest.cs",
-                @"Assets\HotReloadTest\HotTest1.cs"
-            };
-
-            var dllName = "HotReloadTest.dll";
-            var pdbName = "HotReloadTest.pdb";
-
-            var syntaxTreeList = new List<SyntaxTree>();
-
-            foreach (var file in files)
-            {
-                var fullPath = Path.GetFullPath(file);
-                syntaxTreeList.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(file), csharpParseOptions, fullPath, Encoding.UTF8));
-            }
-          
-            var compilation = CSharpCompilation.Create("HotReloadTest", syntaxTreeList, metadataReferences, compilationOptions);
-            
-            var emitOptions = new EmitOptions(
-                debugInformationFormat: DebugInformationFormat.PortablePdb,
-                pdbFilePath: pdbName);
-
-            var dllPath = Path.Combine(kTempCompileToDir, dllName);
-            var pdbPath = Path.Combine(kTempCompileToDir, pdbName);
-            using (var dll = new FileStream(dllPath, FileMode.Create))
-            using(var pdb = new FileStream(pdbPath, FileMode.Create))
-            {
-                compilation.Emit(dll, pdb, options:emitOptions);
-            }
         }
 
         public static void OnScriptCompileSuccess(CompileStatus status)

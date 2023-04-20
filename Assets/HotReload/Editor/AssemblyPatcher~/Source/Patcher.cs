@@ -32,8 +32,6 @@ public class Patcher
         Environment.CurrentDirectory = _inputArgs.workDir;
 
         // 提前把相关dll都载入，方便查找对应类型
-        Stopwatch sw = new Stopwatch();
-        sw.Start();
         foreach (var kv in _inputArgs.fallbackAssemblyPathes)
         {
             try
@@ -48,8 +46,6 @@ public class Patcher
                 Debug.LogError($"load dll fail:{kv.Value}\r\n:{ex.Message}\r\n{ex.StackTrace}");
             }
         }
-        sw.Stop();
-        Debug.Log($"载入相关dll耗时 {sw.ElapsedMilliseconds} ms");
     }
 
     public bool DoPatch()
