@@ -52,7 +52,6 @@ namespace ScriptHotReload
                 var asmdef = TraverseAsmDef(fullPath);
                 if (!string.IsNullOrEmpty(asmdef))
                 {
-                    var key = "Assets" + fullPath.Replace(@"\", "/").Replace(prefix, "");
                     var content = JsonUtility.FromJson<AssemblyDefinitionContent>(File.ReadAllText(asmdef));
                     var value = content.name + ".dll";
                     if (dll2Files.ContainsKey(value) == false)
@@ -61,7 +60,7 @@ namespace ScriptHotReload
                     }
                     dll2AsmPath[value] = asmdef;
 
-                    dll2Files[value].Add(key);
+                    dll2Files[value].Add(fullPath);
                 }
             }
 
