@@ -8,13 +8,16 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using UnityEditor;
 using UnityEditor.Build.Player;
 using UnityEditor.Compilation;
+using UnityEngine;
 using static ScriptHotReload.CompileScript;
+using Debug = UnityEngine.Debug;
 
 namespace ScriptHotReload
 {
@@ -77,49 +80,16 @@ namespace ScriptHotReload
         public static List<string> s_CompileMarco = new List<string>();
 
         private static List<MetadataReference> s_AllRefs = new List<MetadataReference>();
-        
-        public static void CompileHotTest()
-        {
-            var settings = new ScriptCompilationSettings
-            {
-                target = BuildTarget.StandaloneWindows64,
-                group = BuildTargetGroup.Standalone,
-                extraScriptingDefines = new string[]{},
-            };
-            
-            EditorCompilationWrapper.DirtyOndemand(new Dictionary<string, HashSet<string>>()
-            {
-                ["ReloadTest.dll"] = new HashSet<String>()
-                {
-                    "Assets/HotReload/ReloadTest/ReloadTest.cs"
-                }
-            });
 
-            if (s_CompileMarco.Count == 0)
-            {
-                var scriptAssemblySettings = EditorCompilationWrapper.CreateScriptAssemblySettings(
-                    editorBuildParams.platformGroup, editorBuildParams.platform, editorBuildParams.options, editorBuildParams.extraScriptingDefines, HotReloadConfig.kTempCompileToDir);
-
-                editorBuildParams.outputDir = HotReloadConfig.kTempScriptDir;
-                CompilationPipeline.assemblyCompilationStarted += OnAssemblyCompilationStarted;
-
-                EditorCompilationWrapper.CompileScriptsWithSettings(settings);
-                
-            }
-            
-        }
-    
-        static void OnAssemblyCompilationStarted(String name)
+        public static void OnAssemblyCompilationStarted(String name)
         {
             
-            string assemblyName = Path.GetFileNameWithoutExtension(name);
+            string assemblyFilename = Path.GetFileName(name);
 
-            if (assemblyName != "ReloadTest")
+            if (HotReloadConfig.hotReloadAssemblies.Contains(assemblyFilename) == false)
+            {
                 return;
-            
-            CompilationPipeline.assemblyCompilationStarted -= OnAssemblyCompilationStarted;
-
-            string assemblyFilename = assemblyName + ".dll";
+            }
 
             var editorType = typeof(AssetDatabase).Assembly.GetType("UnityEditor.Scripting.ScriptCompilation.EditorCompilation");
 
@@ -141,87 +111,163 @@ namespace ScriptHotReload
             var compiler = compilerTasks[scriptAssembly];
             
             Type tScriptCompilerBase = Type.GetType("UnityEditor.Scripting.Compilers.ScriptCompilerBase, UnityEditor");
-            FieldInfo fiProcess =
-                tScriptCompilerBase.GetField("process", BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo fiProcess = tScriptCompilerBase.GetField("process", BindingFlags.NonPublic | BindingFlags.Instance);
 
             var tmp = ReflectionEx.Get(compiler, "process", fiProcess);
             ProcessStartInfo psi = ReflectionEx.Call(tmp, "GetProcessStartInfo") as ProcessStartInfo;
-            ReflectionEx.Call(compiler, "Dispose");
 
             string responseFile = Regex.Replace(psi.Arguments, "^.*@(.+)$", "$1");
+            
+            
             var text = File.ReadAllText(responseFile);
-            text = Regex.Replace(text, "[\r\n]+", "\n");
-            text = Regex.Replace(text, "^-", "/", RegexOptions.Multiline);
 
-            // get unity macro
+            if (text.Contains("/unsafe") == false)
             {
-                var defines = Regex.Matches(text, "^/define:(.*)$", RegexOptions.Multiline)
-                    .Cast<Match>()
-                    .Select(x => x.Groups[1].Value);
-                s_CompileMarco = defines.Distinct().ToList();
+                text += "/unsafe";
             }
+            File.WriteAllText(responseFile, text);
         }
         
         
-        public static void ManuCompilation()
+        public static void ManuCompilation(Dictionary<string, string>dll2AsmPath)
         {
+            var sw = new Stopwatch();
 
-            if (s_AllRefs.Count == 0)
+            foreach (var hotreloadAsmFileName in HotReloadConfig.hotReloadAssemblies)
             {
-                foreach (var ass in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    if (ass.IsDynamic)
-                        continue;
+                var workingDir = Directory.GetParent(Application.dataPath).FullName;
+                
+                List<MetadataReference> refAsmblyList = new List<MetadataReference>();
+                List<SyntaxTree> syntaxTreeList = new List<SyntaxTree>();
 
-                    if (!string.IsNullOrEmpty(ass.Location))
+                var files = new List<string>();
+                var refs = new List<string>();
+                var symbols = new List<string>();
+                
+                sw.Restart();
+                {
+                    var xmlDoc = new XmlDocument();
+                    xmlDoc.Load(Path.Combine(workingDir, $"{Path.GetFileNameWithoutExtension(hotreloadAsmFileName)}.csproj"));
+                    var xmlNs = new XmlNamespaceManager(xmlDoc.NameTable);
+                    xmlNs.AddNamespace("ns", xmlDoc.DocumentElement.NamespaceURI);
+
+                    var docNode = xmlDoc.SelectSingleNode("/ns:Project", xmlNs);
+
+                    var propertyGroupList = xmlDoc.SelectNodes(".//ns:PropertyGroup", xmlNs);
+                    if (propertyGroupList != null)
                     {
-                        s_AllRefs.Add(MetadataReference.CreateFromFile(ass.Location));
+                        for (int i = 0; i < propertyGroupList.Count; ++i)
+                        {
+                            var propertyNode = propertyGroupList[i];
+                            var defineNode = propertyNode.SelectSingleNode(".//ns:DefineConstants", xmlNs);
+                            if (defineNode == null)
+                            {
+                                continue;
+                            }
+
+                            symbols = defineNode.InnerText.Split(',', ';').ToList();
+                            break;
+                        }
+                    }
+
+                    var itemGroupList = docNode?.SelectNodes("//ns:ItemGroup", xmlNs);
+                    if (itemGroupList != null)
+                    {
+                        for (int i = 0; i < itemGroupList.Count; ++i)
+                        {
+                            var groupNode = itemGroupList[i];
+                            var compileList = groupNode.SelectNodes(".//ns:Compile", xmlNs);
+                            if (compileList != null)
+                            {
+                                for (int j = 0; j < compileList.Count; ++j)
+                                {
+                                    var compileNode = compileList[j];
+                                    var relativePath = (compileNode.Attributes?["Include"]?.InnerText);
+                                    if (relativePath != null && File.Exists(relativePath))
+                                    {
+                                        files.Add(Path.GetFullPath(relativePath));
+                                    }
+                                }
+                            }
+
+                            var refNodeList = groupNode.SelectNodes(".//ns:Reference", xmlNs);
+                            if (refNodeList != null)
+                            {
+                                for (int k = 0; k < refNodeList.Count; ++k)
+                                {
+                                    var refNode = refNodeList[k];
+                                    var refPath = refNode.SelectSingleNode(".//ns:HintPath", xmlNs)?.InnerText;
+                                    if (refPath != null && File.Exists(refPath))
+                                    {
+                                        refs.Add(refPath);
+                                    }
+                                }
+                            }
+                            
+                            var projectNodeList = groupNode.SelectNodes(".//ns:ProjectReference", xmlNs);
+                            if (projectNodeList != null)
+                            {
+                                for(int l=0; l < projectNodeList.Count; ++l)
+                                {
+                                    var projectRefNode = projectNodeList[l];
+                                    var refName = projectRefNode.SelectSingleNode(".//ns:Name", xmlNs)?.InnerText;
+                                    refs.Add(Path.Combine(workingDir, HotReloadConfig.kTempCompileToDir, refName+".dll"));
+                                }
+                            }
+                        }
                     }
                 }
-            }
-          
-            var customMacro = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone).Split(',', ';');;
+                sw.Stop();
+                HookAssemblies.Log($"parse xml cost:  {sw.ElapsedMilliseconds}");
 
-            var builtinMacro = CompileScriptJN.s_CompileMarco;
-
-            var symbols = new HashSet<string>(builtinMacro);
-            symbols.UnionWith(customMacro);
-            
-            var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe:true).WithMetadataImportOptions(MetadataImportOptions.All);
-
-            ReflectionEx.Set(compilationOptions, "TopLevelBinderFlags" , (uint)1 << 22);
-
-            var csharpParseOptions = new CSharpParseOptions(LanguageVersion.Latest, preprocessorSymbols: symbols);
-
-            var files = new List<String>
-            {
-                @"Assets\HotReloadTest\HotTest.cs",
-                @"Assets\HotReloadTest\HotTest1.cs"
-            };
-
-            var dllName = "HotReloadTest.dll";
-            var pdbName = "HotReloadTest.pdb";
-
-            var syntaxTreeList = new List<SyntaxTree>();
-
-            foreach (var file in files)
-            {
-                var fullPath = Path.GetFullPath(file);
-                syntaxTreeList.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(file), csharpParseOptions, fullPath, Encoding.UTF8));
-            }
-          
-            var compilation = CSharpCompilation.Create("HotReloadTest", syntaxTreeList, s_AllRefs, compilationOptions);
-            
-            var emitOptions = new EmitOptions(
-                debugInformationFormat: DebugInformationFormat.PortablePdb,
-                pdbFilePath: pdbName);
-
-            var dllPath = Path.Combine(HotReloadConfig.kTempCompileToDir, dllName);
-            var pdbPath = Path.Combine(HotReloadConfig.kTempCompileToDir, pdbName);
-            using (var dll = new FileStream(dllPath, FileMode.Create))
-            using(var pdb = new FileStream(pdbPath, FileMode.Create))
-            {
-                compilation.Emit(dll, pdb, options:emitOptions);
+                sw.Restart();
+                {
+                    var csharpParseOptions = new CSharpParseOptions(LanguageVersion.Latest, preprocessorSymbols: symbols);
+                    syntaxTreeList = files.Select(f => CSharpSyntaxTree.ParseText(File.ReadAllText(f), csharpParseOptions, f, Encoding.UTF8)).ToList();
+                }
+                sw.Stop();
+                HookAssemblies.Log($"parse c# file cost:  {sw.ElapsedMilliseconds}");
+                
+                sw.Restart();
+                {
+                    refAsmblyList = refs.Select(dllPath => MetadataReference.CreateFromFile(dllPath) as MetadataReference).ToList();
+                }
+                sw.Stop();
+                HookAssemblies.Log($"create dll refs cost:  {sw.ElapsedMilliseconds}");
+                
+                var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, deterministic:true);
+                
+                var compilation = CSharpCompilation.Create(Path.GetFileNameWithoutExtension(hotreloadAsmFileName), syntaxTreeList, refAsmblyList, compilationOptions);
+                
+                var dllName = hotreloadAsmFileName;
+                var pdbName = Path.GetFileNameWithoutExtension(hotreloadAsmFileName) + ".pdb";
+                
+                var emitOptions = new EmitOptions(
+                    debugInformationFormat: DebugInformationFormat.PortablePdb,
+                    pdbFilePath: pdbName);
+                
+                sw.Restart();
+                var dllPath = Path.Combine(HotReloadConfig.kTempCompileToDir, dllName);
+                var pdbPath = Path.Combine(HotReloadConfig.kTempCompileToDir, pdbName);
+                using (var dll = new FileStream(dllPath, FileMode.Create))
+                {
+                    using(var pdb = new FileStream(pdbPath, FileMode.Create))
+                    {
+                        var result = compilation.Emit(dll, pdb, options:emitOptions);
+                        if (!result.Success)
+                        {
+                            foreach (var diagnos in result.Diagnostics)
+                            {
+                                if (diagnos.Severity == DiagnosticSeverity.Error)
+                                {
+                                    Debug.LogError($"compile error: {diagnos.GetMessage()}");
+                                }
+                            }
+                        }
+                    }
+                }
+                sw.Stop();
+                HookAssemblies.Log($"generate target dll cost: {sw.ElapsedMilliseconds}");
             }
         }
     }

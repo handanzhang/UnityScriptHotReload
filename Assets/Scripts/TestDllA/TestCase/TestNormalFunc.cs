@@ -1,9 +1,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.UI;
+
 
 namespace NS_Test.TestCase
 {
@@ -28,14 +28,8 @@ namespace NS_Test.TestCase
                 Debug.Log($"{str}...{x}");
                 return x > 101;
             };
-            s_lambda = f;
-            
-            
-            var asm = Assembly.LoadFrom(@"E:\Project-J1\client\Temp\ScriptHotReload\AreaEditor_patch_0.dll");
-            var type = asm.GetType("ToolEditor.AreaEditor.AreaVoxelizationHelper");
-            var method = type.GetMethod("GenerateTransmitTriggerData", BindingFlags.Public | BindingFlags.Static);
-            var handle = method.MethodHandle.GetFunctionPointer();
-            
+            f(535144);
+            NS_Test.TestDllB_Main.Calc(5, 6);
         }
     
         public static string str { get; set; } = "default str";

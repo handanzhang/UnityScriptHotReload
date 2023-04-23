@@ -46,6 +46,7 @@ namespace ScriptHotReload
 
             var prefix = Application.dataPath.Replace(@"\", "/");
 
+            var dll2AsmPath = new Dictionary<string, string>();
             foreach (var fullPath in s_CacheFilePath.ToList())
             {
                 var asmdef = TraverseAsmDef(fullPath);
@@ -58,6 +59,7 @@ namespace ScriptHotReload
                     {
                         dll2Files[value] = new HashSet<string>();
                     }
+                    dll2AsmPath[value] = asmdef;
 
                     dll2Files[value].Add(key);
                 }
@@ -77,7 +79,7 @@ namespace ScriptHotReload
 
             Log("hot reload dll: " + sb.ToString());
 
-            GenPatchAssemblies.DoGenPatchAssemblies(false, dll2Files);
+            GenPatchAssemblies.DoGenPatchAssemblies(false, dll2Files, dll2AsmPath);
         }
 
         private static string TraverseAsmDef(string fullPath)

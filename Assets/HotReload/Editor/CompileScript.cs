@@ -55,15 +55,18 @@ namespace ScriptHotReload
             var scriptAssemblySettings = EditorCompilationWrapper.CreateScriptAssemblySettings(
                 editorBuildParams.platformGroup, editorBuildParams.platform, editorBuildParams.options, editorBuildParams.extraScriptingDefines, outputDir);
 
+            CompilationPipeline.assemblyCompilationStarted -= CompileScriptJN.OnAssemblyCompilationStarted;
+            CompilationPipeline.assemblyCompilationStarted += CompileScriptJN.OnAssemblyCompilationStarted;
             CompilationPipeline.assemblyCompilationFinished -= AsmCompileResult;
             CompilationPipeline.assemblyCompilationFinished += AsmCompileResult;
 
             EditorApplication.update -= EditorApplication_Update;
             EditorApplication.update += EditorApplication_Update;
             
+            s_CompileRequested = true;
+
             EditorCompilationWrapper.CompileScriptsWithSettings(scriptAssemblySettings);
             Debug.Log($"开始编译dll到目录: {outputDir}");
-            s_CompileRequested = true;
             
 
             ManualTickCompilationPipeline();
@@ -119,6 +122,7 @@ namespace ScriptHotReload
                         Debug.LogError($"编译失败:{compileStatus}");
 
                     CompilationPipeline.assemblyCompilationFinished -= AsmCompileResult;
+                    CompilationPipeline.assemblyCompilationStarted -= CompileScriptJN.OnAssemblyCompilationStarted;
                     EditorApplication.update -= EditorApplication_Update;
                     OnCompileSuccess?.Invoke(compileStatus);
                 }

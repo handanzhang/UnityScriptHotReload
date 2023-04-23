@@ -48,7 +48,7 @@ namespace ScriptHotReload
             methodsToHook.Clear();
         }
 
-        public static void DoGenPatchAssemblies(bool dirtyAll, Dictionary<string, HashSet<string>> dll2Files)
+        public static void DoGenPatchAssemblies(bool dirtyAll, Dictionary<string, HashSet<string>> dll2Files, Dictionary<string, string> dll2AsmPath)
         {
             if (!Application.isPlaying)
                 return;
@@ -72,14 +72,12 @@ namespace ScriptHotReload
                 EditorCompilationWrapper.DirtyOndemand(dll2Files);
             }
             
-#if USE_UNITY_COMPILER 
+#if USE_HOTRELOAD_COMPILER 
+            CompileScriptJN.ManuCompilation(dll2AsmPath);
+            OnScriptCompileSuccess(CompileStatus.Idle);
+#else
             CompileScript.OnCompileSuccess = OnScriptCompileSuccess;
             CompileScript.CompileScriptToDir(kTempCompileToDir);
-#else
-            
-            CompileScriptJN.CompileHotTest();
-            CompileScriptJN.ManuCompilation();
-            OnScriptCompileSuccess(CompileStatus.Idle);
 #endif
 
         }

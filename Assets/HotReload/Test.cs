@@ -26,12 +26,12 @@ public class Test : MonoBehaviour
         NS_Test.TestCase.TestNormalFunc.Test(ref a);
         NS_Test.TestCase.TestNormalFunc.Test2();
 
-        // TestFurther.Print();
-        // var test = new TestCls(gameObject);
-        //
-        // test.FuncA(out var val);
-        // Debug.Log($"OnBtnTest:val={val}");
-        //
-        // Debug.Log($"Test3.s_val={TestCls.s_val}");
+        TestFurther.Print();
+        var test = new TestCls(gameObject);
+        
+        test.FuncA(out var val);
+        Debug.Log($"OnBtnTest:val={val}");
+        
+        Debug.Log($"Test3.s_val={TestCls.s_val}");
     }
 }
