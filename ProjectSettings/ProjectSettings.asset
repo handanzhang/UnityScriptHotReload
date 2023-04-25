@@ -796,7 +796,7 @@ PlayerSettings:
   webGLDecompressionFallback: 0
   scriptingDefineSymbols:
     0: SCRIPT_PATCH_DEBUG
-    1: ENABLE_JN_HOT_RELOAD;USE_UNITY_COMPILER
+    1: System.String[];ODIN_INSPECTOR;ODIN_INSPECTOR_3
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend: {}

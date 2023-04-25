@@ -28,7 +28,7 @@ namespace NS_Test.TestCase
                 Debug.Log($"{str}...{x}");
                 return x > 101;
             };
-            f(535144);
+            f(102);
             NS_Test.TestDllB_Main.Calc(5, 6);
         }
     

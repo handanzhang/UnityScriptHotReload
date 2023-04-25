@@ -22,10 +22,7 @@ namespace HOT_RELOAD_TEST
         [MenuItem("haitong/test")]
         public static void Test()
         {
-           
-            Debug.Log(typeof(XXUU).GetField("i", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null));
-            
-            Debug.Log("JN_TEST-44");
+            Debug.Log("JN1_TEST-4554555");
 
             Debug.Log(_ii);
 

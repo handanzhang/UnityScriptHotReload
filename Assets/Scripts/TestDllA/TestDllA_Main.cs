@@ -87,7 +87,7 @@ namespace NS_Test
 
         public void FuncA(out int val)
         {
-            val = 100;
+            val = 101;
             var bb = new SubB();
             bb.Print();
             

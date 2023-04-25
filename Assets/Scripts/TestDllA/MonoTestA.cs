@@ -12,7 +12,7 @@ public class MonoTestA : MonoBehaviour
 
     public void ShowText()
     {
-        Debug.Log($"1111 MonoTestA.ShowText: text is:\"{text.text}\"");
+        Debug.Log($"11112 MonoTestA.ShowText: text is:\"{text.text}\"");
     }
 }
 
